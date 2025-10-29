@@ -239,6 +239,68 @@ class AdvancedLanguageTutor:
             prompt=conversation_prompt
         )
 
+    def transcribe_audio_streaming(self, audio_bytes: bytes, format: str = "wav") -> dict:
+        """Transcribe streaming audio chunks using faster-whisper"""
+        try:
+            from faster_whisper import WhisperModel
+            import io
+            
+            print("🎤 Transcribing audio chunk...")
+            
+            model = WhisperModel(WHISPER_MODEL, device="cpu")
+            
+            # Convert bytes to file-like object
+            audio_buffer = io.BytesIO(audio_bytes)
+            
+            # Save temporary audio file
+            import tempfile
+            with tempfile.NamedTemporaryFile(delete=False, suffix=f'.{format}') as tmp_file:
+                tmp_file.write(audio_bytes)
+                tmp_path = tmp_file.name
+            
+            try:
+                segments, info = model.transcribe(tmp_path, language="en", beam_size=1, vad_filter=True)
+                
+                words = []
+                full_text_parts = []
+                
+                for seg in segments:
+                    if hasattr(seg, 'words') and seg.words:
+                        for w in seg.words:
+                            words.append({
+                                "word": w.word,
+                                "start": float(w.start) if w.start is not None else None,
+                                "end": float(w.end) if w.end is not None else None,
+                                "confidence": float(w.probability) if getattr(w, 'probability', None) is not None else None,
+                            })
+                            full_text_parts.append(w.word)
+                    else:
+                        full_text_parts.append(seg.text)
+                
+                text = " ".join([t.strip() for t in full_text_parts]).strip()
+                
+                avg_conf = None
+                confs = [w["confidence"] for w in words if w.get("confidence") is not None]
+                if confs:
+                    avg_conf = sum(confs) / len(confs)
+                
+                result = {
+                    "text": text,
+                    "tokens": words,
+                    "confidence_summary": {"avg_token_confidence": avg_conf},
+                }
+                
+                return result
+            finally:
+                # Clean up temp file
+                import os
+                if os.path.exists(tmp_path):
+                    os.unlink(tmp_path)
+            
+        except Exception as e:
+            print(f"❌ Streaming transcription failed: {e}")
+            return {"text": "", "tokens": [], "confidence_summary": {"avg_token_confidence": None}}
+
     def transcribe_audio(self, audio_path: str) -> dict:
         """Transcribe audio using faster-whisper"""
         try:
