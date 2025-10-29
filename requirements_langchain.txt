@@ -1,0 +1,35 @@
+# Core LangChain dependencies
+langchain
+langchain-community
+langchain-core
+
+# Ollama integration
+langchain-ollama
+
+# Vector store for progress tracking
+chromadb==0.4.22
+
+# Enhanced data handling
+pydantic==2.7.3
+numpy==1.24.3
+
+# Streamlit web interface
+streamlit
+matplotlib
+nest-asyncio
+
+# Existing dependencies
+fastapi==0.111.0
+uvicorn[standard]==0.30.1
+pydantic-settings==2.3.2
+sqlmodel==0.0.21
+aiosqlite==0.20.0
+httpx==0.27.0
+aiofiles==23.2.1
+python-multipart==0.0.9
+faster-whisper==1.0.1
+soundfile==0.12.1
+pytest==8.2.2
+pytest-asyncio==0.23.7
+anyio==4.4.0
+greenlet==3.2.4
