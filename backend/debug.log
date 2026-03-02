@@ -135,3 +135,62 @@ Transcript: "Hola, hola. ¿Tú me entiendes? ¿Tú me entiendo? Mi nombre soy Ra
     "confidence": 0.9
   }
 ]}...
+2026-03-02 21:24:20,402 - app.main - INFO - Database engine disposed
+2026-03-02 21:24:20,948 - app.main - INFO - Database tables created
+2026-03-02 21:24:20,966 - app.main - INFO - Mistake types seeded
+2026-03-02 21:24:28,851 - app.main - INFO - Database engine disposed
+2026-03-02 21:24:29,263 - app.main - INFO - Database tables created
+2026-03-02 21:24:29,282 - app.main - INFO - Mistake types seeded
+2026-03-02 21:25:33,293 - app.main - INFO - Database engine disposed
+2026-03-02 21:25:33,892 - app.main - INFO - Database tables created
+2026-03-02 21:25:33,923 - app.main - INFO - Mistake types seeded
+2026-03-02 21:25:40,300 - app.main - INFO - Database engine disposed
+2026-03-02 21:25:40,881 - app.main - INFO - Database tables created
+2026-03-02 21:25:40,911 - app.main - INFO - Mistake types seeded
+2026-03-02 21:25:46,880 - app.main - INFO - Database engine disposed
+2026-03-02 21:25:47,469 - app.main - INFO - Database tables created
+2026-03-02 21:25:47,498 - app.main - INFO - Mistake types seeded
+2026-03-02 21:32:27,544 - app.main - INFO - Database engine disposed
+2026-03-02 21:32:28,161 - app.main - INFO - Database tables created
+2026-03-02 21:32:28,192 - app.main - INFO - Mistake types seeded
+2026-03-02 21:32:30,213 - app.main - INFO - Database engine disposed
+2026-03-02 21:32:30,779 - app.main - INFO - Database tables created
+2026-03-02 21:32:30,808 - app.main - INFO - Mistake types seeded
+2026-03-02 21:32:45,667 - app.main - INFO - Database engine disposed
+2026-03-02 21:32:47,101 - app.main - INFO - Database tables created
+2026-03-02 21:32:47,130 - app.main - INFO - Mistake types seeded
+2026-03-02 21:33:09,610 - app.services.stt.whisper_local - INFO - Loading faster-whisper model 'base' (first load downloads ~140MB)...
+2026-03-02 21:33:10,151 - app.services.stt.whisper_local - INFO - faster-whisper model loaded.
+2026-03-02 21:33:10,206 - faster_whisper - INFO - Processing audio with duration 00:02.940
+2026-03-02 21:33:10,260 - faster_whisper - INFO - VAD filter removed 00:01.372 of audio
+2026-03-02 21:33:10,918 - app.services.stt.whisper_local - INFO - STT Output (Language: en): "Hello" (Avg Confidence: 0.46)
+2026-03-02 21:33:11,173 - faster_whisper - INFO - Processing audio with duration 00:06.000
+2026-03-02 21:33:11,203 - faster_whisper - INFO - VAD filter removed 00:01.008 of audio
+2026-03-02 21:33:12,018 - app.services.stt.whisper_local - INFO - STT Output (Language: en): "Hello, skill me want improve. We want to be" (Avg Confidence: 0.62)
+2026-03-02 21:33:14,186 - faster_whisper - INFO - Processing audio with duration 00:09.000
+2026-03-02 21:33:14,229 - faster_whisper - INFO - VAD filter removed 00:01.192 of audio
+2026-03-02 21:33:15,099 - app.services.stt.whisper_local - INFO - STT Output (Language: en): "Hello, skill me want improve. We want to be good in sleeping" (Avg Confidence: 0.72)
+2026-03-02 21:33:16,512 - app.api.transcribe - INFO - WebSocket client disconnected
+2026-03-02 21:33:17,759 - app.services.analysis - INFO - LLM System Prompt (Language: en): """You are a grammar and pedagogy assistant. When given a transcript string, output JSON exactly in the schema specified. For each suspected error, include type, span text, character indices, suggested correction, short pedagogical explanation (1-2 sentences), and confidence. Use canonical type codes: verb-tense, preposition, article, word-order, pronunciation, false-friend, pronoun, pluralization, vocabulary, subject-verb-agreement, other. If a token's STT confidence < 0.6, set "stt_uncertain": true. If you are uncertain whether something is an error, set "uncertain": true and provide a short reason. Output only valid JSON matching this schema: {"mistakes": [{"type": "str", "span_text": "str", "start_char": 0, "end_char": 0, "suggested_correction": "str", "explanation": "str", "confidence": 0.0, "stt_uncertain": false, "uncertain": false, "uncertain_reason": null}]}"""
+2026-03-02 21:33:17,759 - app.services.analysis - INFO - LLM User Prompt: """Language code: en
+Transcript: "Hello, skill me want improve. We want to be good in sleeping"
+
+Prior mistake summary (top types with counts): verb-tense (17), pronoun (3), other (1)"""
+2026-03-02 21:34:17,988 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/chat "HTTP/1.1 200 OK"
+2026-03-02 21:34:17,994 - app.services.analysis - INFO - LLM Raw Response: {"mistakes": [
+{
+"type": "verb-tense",
+"span_text": "want improve.",
+"start_char": 14,
+"end_char": 22,
+"suggested_correction": "want to improve.",
+"explanation": "The verb tense is incorrect. The sentence should use 'to' to indicate the purpose of wanting to improve.",
+"confidence": 0.8
+},
+{
+"type": "subject-verb-agreement",
+"span_text": "We want to be good in sleeping",
+"start_char": 9,
+"end_char": 31,
+"suggested_correction": "We want to become good at sleeping",
+"explanation": "The subject 'We...

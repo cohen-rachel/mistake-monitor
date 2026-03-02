@@ -1,0 +1,15 @@
+beginner|daily_routine|Describe your daily routine from morning to evening.
+beginner|family_intro|Talk about your family and where they live.
+beginner|favorite_food|Describe your favorite food and how to prepare it.
+beginner|weekend_plan|Explain what you usually do on weekends.
+beginner|hobby_intro|Describe one hobby you enjoy and why.
+intermediate|challenging_day|Describe a difficult day and how you handled it.
+intermediate|travel_memory|Share a travel memory and what surprised you.
+intermediate|learning_goal|Explain a skill you want to improve this year.
+intermediate|work_school_project|Describe a project you completed and the result.
+intermediate|city_comparison|Compare two cities you know well.
+advanced|technology_impact|Discuss how technology changes daily life in your country.
+advanced|education_reform|Explain one change you would make to education and why.
+advanced|culture_identity|Talk about how culture shapes personal identity.
+advanced|environment_policy|Give your opinion on one environmental policy.
+advanced|future_society|Predict one major social change in the next 20 years.

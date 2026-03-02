@@ -8,7 +8,9 @@ import type {
   SessionListOut,
   AnalyzeResponse,
   InsightsResponse,
-  PracticeResponse,
+  TopicListResponse,
+  TopicHistoryResponse,
+  PracticeSelection,
 } from "../types";
 
 const API_BASE = "/api";
@@ -31,21 +33,39 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
 export async function createSessionWithTranscript(
   transcriptText: string,
-  language: string = "en"
+  language: string = "en",
+  practice?: PracticeSelection
 ): Promise<SessionDetailOut> {
   const form = new FormData();
   form.append("transcript_text", transcriptText);
   form.append("language", language);
+  if (practice) {
+    form.append("practice_topic_key", practice.topic_key);
+    form.append("practice_topic_text", practice.topic_text);
+    form.append("is_free_talk", String(practice.is_free_talk));
+    if (practice.estimated_level) {
+      form.append("estimated_level", practice.estimated_level);
+    }
+  }
   return request<SessionDetailOut>("/sessions", { method: "POST", body: form });
 }
 
 export async function createSessionWithAudio(
   audioFile: File,
-  language: string = "en"
+  language: string = "en",
+  practice?: PracticeSelection
 ): Promise<SessionDetailOut> {
   const form = new FormData();
   form.append("audio_file", audioFile);
   form.append("language", language);
+  if (practice) {
+    form.append("practice_topic_key", practice.topic_key);
+    form.append("practice_topic_text", practice.topic_text);
+    form.append("is_free_talk", String(practice.is_free_talk));
+    if (practice.estimated_level) {
+      form.append("estimated_level", practice.estimated_level);
+    }
+  }
   return request<SessionDetailOut>("/sessions", { method: "POST", body: form });
 }
 
@@ -84,20 +104,22 @@ export async function getInsights(
   );
 }
 
-// ---------- Practice ----------
+// ---------- Topic Practice ----------
 
-export async function getPractice(
-  mistakeTypeCode: string,
-  count: number = 3
-): Promise<PracticeResponse> {
-  return request<PracticeResponse>("/practice", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      mistake_type_code: mistakeTypeCode,
-      count,
-    }),
-  });
+export async function getTopics(language: string, userId: number = 1): Promise<TopicListResponse> {
+  return request<TopicListResponse>(
+    `/topics?language=${encodeURIComponent(language)}&user_id=${userId}`
+  );
+}
+
+export async function getTopicHistory(
+  topicKey: string,
+  language: string,
+  userId: number = 1
+): Promise<TopicHistoryResponse> {
+  return request<TopicHistoryResponse>(
+    `/topics/history?topic_key=${encodeURIComponent(topicKey)}&language=${encodeURIComponent(language)}&user_id=${userId}`
+  );
 }
 
 // ---------- WebSocket ----------

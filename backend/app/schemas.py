@@ -84,12 +84,6 @@ class AnalyzeRequest(BaseModel):
 class LLMMistake(BaseModel):
     """Schema expected from the LLM JSON output."""
     type: str
-    span_text: str
-    start_char: int
-    end_char: int
-    suggested_correction: str
-    explanation: str
-    confidence: float
     span_text: Optional[str] = None
     start_char: Optional[int] = None
     end_char: Optional[int] = None
@@ -159,3 +153,34 @@ class PracticePrompt(BaseModel):
 class PracticeResponse(BaseModel):
     mistake_type_code: str
     prompts: list[PracticePrompt]
+
+
+# ---------- Topic Practice ----------
+class TopicItem(BaseModel):
+    key: str
+    title: str
+    prompt: str
+    level: str
+
+
+class TopicListResponse(BaseModel):
+    estimated_level: str
+    topics: list[TopicItem]
+
+
+class TopicAttemptItem(BaseModel):
+    id: int
+    session_id: int
+    date: str
+    language: str
+    topic_key: str
+    topic_text: str
+    is_free_talk: bool
+    estimated_level: Optional[str] = None
+    mistake_count: int
+    transcript: str
+
+
+class TopicHistoryResponse(BaseModel):
+    topic_key: str
+    attempts: list[TopicAttemptItem]

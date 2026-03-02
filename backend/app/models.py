@@ -29,6 +29,7 @@ class User(Base):
 
     sessions = relationship("Session", back_populates="user", lazy="selectin")
     language_profiles = relationship("UserLanguageProfile", back_populates="user", lazy="selectin")
+    practice_attempts = relationship("PracticeAttempt", back_populates="user", lazy="selectin")
 
 
 class Session(Base):
@@ -48,6 +49,12 @@ class Session(Base):
     mistakes = relationship("Mistake", back_populates="session", lazy="selectin")
     language_profile_link = relationship(
         "SessionLanguageProfile",
+        back_populates="session",
+        uselist=False,
+        lazy="selectin",
+    )
+    practice_attempt = relationship(
+        "PracticeAttempt",
         back_populates="session",
         uselist=False,
         lazy="selectin",
@@ -126,3 +133,21 @@ class Mistake(Base):
 
     session = relationship("Session", back_populates="mistakes")
     mistake_type = relationship("MistakeType", back_populates="mistakes", lazy="selectin")
+
+
+class PracticeAttempt(Base):
+    """Stores a user's answer for a specific practice topic/session for future comparison."""
+    __tablename__ = "practice_attempts"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    session_id = Column(Integer, ForeignKey("sessions.id"), nullable=False, unique=True, index=True)
+    language = Column(String(10), nullable=False, default="en", index=True)
+    topic_key = Column(String(100), nullable=False, index=True)
+    topic_text = Column(Text, nullable=False)
+    is_free_talk = Column(Boolean, default=False, nullable=False)
+    estimated_level = Column(String(20), nullable=True)  # beginner | intermediate | advanced
+    created_at = Column(DateTime, default=utcnow, nullable=False)
+
+    user = relationship("User", back_populates="practice_attempts")
+    session = relationship("Session", back_populates="practice_attempt")

@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import AudioRecorder from "../components/AudioRecorder";
 import TranscriptDisplay from "../components/TranscriptDisplay";
 import MistakeCard from "../components/MistakeCard";
@@ -6,8 +6,15 @@ import {
   createSessionWithTranscript,
   createSessionWithAudio,
   analyzeSession,
+  getTopics,
+  getTopicHistory,
 } from "../services/api";
-import type { MistakeOut } from "../types";
+import type {
+  MistakeOut,
+  TopicItem,
+  TopicAttemptItem,
+  PracticeSelection,
+} from "../types";
 
 const sectionStyle: React.CSSProperties = {
   background: "#fff",
@@ -51,18 +58,34 @@ const btnDisabled: React.CSSProperties = {
   cursor: "not-allowed",
 };
 
+function formatDuration(totalSeconds: number): string {
+  const m = Math.floor(totalSeconds / 60)
+    .toString()
+    .padStart(2, "0");
+  const s = (totalSeconds % 60).toString().padStart(2, "0");
+  return `${m}:${s}`;
+}
+
 export default function Landing() {
   const [tab, setTab] = useState<"record" | "upload">("record");
   const [language, setLanguage] = useState("en");
 
-  // -- Record tab state --
+  // Topic practice state
+  const [topics, setTopics] = useState<TopicItem[]>([]);
+  const [estimatedLevel, setEstimatedLevel] = useState("beginner");
+  const [selectedTopicKey, setSelectedTopicKey] = useState("free_talk");
+  const [topicHistory, setTopicHistory] = useState<TopicAttemptItem[]>([]);
+  const [topicsLoading, setTopicsLoading] = useState(false);
+
+  // Record state
   const [isRecording, setIsRecording] = useState(false);
+  const [elapsedSec, setElapsedSec] = useState(0);
   const [liveTranscript, setLiveTranscript] = useState("");
   const [analyzing, setAnalyzing] = useState(false);
   const [mistakes, setMistakes] = useState<MistakeOut[]>([]);
   const [statusMsg, setStatusMsg] = useState("");
 
-  // -- Upload tab state --
+  // Upload state
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadAnalyzing, setUploadAnalyzing] = useState(false);
   const [uploadMistakes, setUploadMistakes] = useState<MistakeOut[]>([]);
@@ -71,7 +94,93 @@ export default function Landing() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // -- Record handlers --
+  const selectedTopic = useMemo(
+    () => topics.find((t) => t.key === selectedTopicKey) ?? null,
+    [topics, selectedTopicKey]
+  );
+
+  const buildPracticeSelection = useCallback((): PracticeSelection => {
+    if (selectedTopicKey === "free_talk" || !selectedTopic) {
+      return {
+        topic_key: "free_talk",
+        topic_text: "Speak freely about anything you want with no fixed prompt.",
+        is_free_talk: true,
+        estimated_level: estimatedLevel,
+      };
+    }
+    return {
+      topic_key: selectedTopic.key,
+      topic_text: selectedTopic.prompt,
+      is_free_talk: false,
+      estimated_level: estimatedLevel,
+    };
+  }, [estimatedLevel, selectedTopic, selectedTopicKey]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadTopics = async () => {
+      setTopicsLoading(true);
+      try {
+        const data = await getTopics(language);
+        if (cancelled) return;
+        setTopics(data.topics);
+        setEstimatedLevel(data.estimated_level);
+        if (!data.topics.some((t) => t.key === selectedTopicKey)) {
+          setSelectedTopicKey(data.topics[0]?.key ?? "free_talk");
+        }
+      } catch {
+        if (!cancelled) {
+          setTopics([]);
+          setEstimatedLevel("beginner");
+          setSelectedTopicKey("free_talk");
+        }
+      } finally {
+        if (!cancelled) setTopicsLoading(false);
+      }
+    };
+    loadTopics();
+    return () => {
+      cancelled = true;
+    };
+  }, [language, selectedTopicKey]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadHistory = async () => {
+      if (!selectedTopicKey || selectedTopicKey === "free_talk") {
+        setTopicHistory([]);
+        return;
+      }
+      try {
+        const data = await getTopicHistory(selectedTopicKey, language);
+        if (!cancelled) {
+          setTopicHistory(data.attempts);
+        }
+      } catch {
+        if (!cancelled) setTopicHistory([]);
+      }
+    };
+    loadHistory();
+    return () => {
+      cancelled = true;
+    };
+  }, [language, selectedTopicKey]);
+
+  useEffect(() => {
+    if (!isRecording) return;
+    const id = window.setInterval(() => {
+      setElapsedSec((prev) => prev + 1);
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [isRecording]);
+
+  const durationHint = useMemo(() => {
+    if (!isRecording) return "";
+    if (elapsedSec < 30) return "Keep speaking. Target at least 30 seconds.";
+    if (elapsedSec <= 60) return "Great length. You are in the 30-60 second target range.";
+    return "You can stop anytime. You already exceeded the target range.";
+  }, [elapsedSec, isRecording]);
+
   const handleChunk = useCallback((text: string, fullText?: string) => {
     if (fullText) {
       setLiveTranscript(fullText);
@@ -82,7 +191,20 @@ export default function Landing() {
 
   const handleStatusChange = useCallback((recording: boolean) => {
     setIsRecording(recording);
+    if (recording) {
+      setElapsedSec(0);
+      setStatusMsg("");
+      setMistakes([]);
+      setLiveTranscript("");
+    }
   }, []);
+
+  const handleRandomizeTopic = () => {
+    const selectable = topics.filter((t) => t.key !== "free_talk");
+    if (selectable.length === 0) return;
+    const next = selectable[Math.floor(Math.random() * selectable.length)];
+    setSelectedTopicKey(next.key);
+  };
 
   const handleAnalyzeRecording = async () => {
     const fullText = liveTranscript.trim();
@@ -94,7 +216,11 @@ export default function Landing() {
     setAnalyzing(true);
     setStatusMsg("Saving session...");
     try {
-      const session = await createSessionWithTranscript(fullText, language);
+      const session = await createSessionWithTranscript(
+        fullText,
+        language,
+        buildPracticeSelection()
+      );
       setStatusMsg("Analyzing...");
       const result = await analyzeSession(session.id);
       setMistakes(result.mistakes);
@@ -103,6 +229,10 @@ export default function Landing() {
           ? `Found ${result.mistakes.length} mistake(s).`
           : "No mistakes found!"
       );
+      if (selectedTopicKey !== "free_talk") {
+        const updated = await getTopicHistory(selectedTopicKey, language);
+        setTopicHistory(updated.attempts);
+      }
     } catch (err: any) {
       setStatusMsg(`Error: ${err.message}`);
     } finally {
@@ -114,15 +244,19 @@ export default function Landing() {
     setLiveTranscript("");
     setMistakes([]);
     setStatusMsg("");
+    setElapsedSec(0);
   };
 
-  // -- Upload handlers --
   const handleUploadAnalyze = async () => {
     if (!uploadFile) return;
     setUploadAnalyzing(true);
     setUploadStatus("Uploading and analyzing...");
     try {
-      const session = await createSessionWithAudio(uploadFile, language);
+      const session = await createSessionWithAudio(
+        uploadFile,
+        language,
+        buildPracticeSelection()
+      );
       setUploadTranscript(session.transcript?.raw_text || "");
       setUploadMistakes(session.mistakes || []);
       setUploadStatus(
@@ -143,17 +277,16 @@ export default function Landing() {
         Language Tutor
       </h1>
       <p style={{ color: "#64748b", marginBottom: 24 }}>
-        Record yourself speaking or upload an audio file to get feedback on
-        grammar and vocabulary.
+        Practice with a suggested topic or choose Free Talk, then get analysis and
+        track improvement over time.
       </p>
 
-      {/* Tabs */}
       <div style={tabBarStyle}>
         <button
           style={{ ...tabStyle(tab === "record"), borderRadius: "8px 0 0 8px" }}
           onClick={() => setTab("record")}
         >
-          Real-time Recording
+          Real-time Speaking
         </button>
         <button
           style={{ ...tabStyle(tab === "upload"), borderRadius: "0 8px 8px 0" }}
@@ -163,42 +296,89 @@ export default function Landing() {
         </button>
       </div>
 
-      <div style={{ marginBottom: 16 }}>
-        <label style={{ fontSize: 14, color: "#475569", marginRight: 8 }}>
-          Spoken language:
-        </label>
-        <select
-          value={language}
-          onChange={(e) => setLanguage(e.target.value)}
-          style={{
-            padding: "8px 10px",
-            borderRadius: 8,
-            border: "1px solid #cbd5e1",
-            background: "#fff",
-            color: "#1e293b",
-          }}
-        >
-          <option value="en">English</option>
-          <option value="es">Spanish</option>
-          <option value="fr">French</option>
-          <option value="de">German</option>
-          <option value="it">Italian</option>
-          <option value="pt">Portuguese</option>
-          <option value="nl">Dutch</option>
-          <option value="ru">Russian</option>
-          <option value="uk">Ukrainian</option>
-          <option value="pl">Polish</option>
-          <option value="tr">Turkish</option>
-          <option value="ar">Arabic</option>
-          <option value="he">Hebrew</option>
-          <option value="hi">Hindi</option>
-          <option value="ja">Japanese</option>
-          <option value="ko">Korean</option>
-          <option value="zh">Chinese</option>
-        </select>
+      <div style={{ ...sectionStyle, marginBottom: 16 }}>
+        <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center" }}>
+          <div>
+            <label style={{ fontSize: 14, color: "#475569", marginRight: 8 }}>
+              Spoken language:
+            </label>
+            <select
+              value={language}
+              onChange={(e) => setLanguage(e.target.value)}
+              style={{
+                padding: "8px 10px",
+                borderRadius: 8,
+                border: "1px solid #cbd5e1",
+                background: "#fff",
+                color: "#1e293b",
+              }}
+            >
+              <option value="en">English</option>
+              <option value="es">Spanish</option>
+              <option value="fr">French</option>
+              <option value="de">German</option>
+              <option value="it">Italian</option>
+              <option value="pt">Portuguese</option>
+              <option value="ja">Japanese</option>
+            </select>
+          </div>
+
+          <div style={{ fontSize: 13, color: "#475569" }}>
+            Estimated level: <strong>{estimatedLevel}</strong>
+          </div>
+        </div>
+
+        <div style={{ marginTop: 12, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <label style={{ fontSize: 14, color: "#475569" }}>Practice topic:</label>
+          <select
+            value={selectedTopicKey}
+            onChange={(e) => setSelectedTopicKey(e.target.value)}
+            style={{
+              minWidth: 260,
+              padding: "8px 10px",
+              borderRadius: 8,
+              border: "1px solid #cbd5e1",
+              background: "#fff",
+              color: "#1e293b",
+            }}
+            disabled={topicsLoading || topics.length === 0}
+          >
+            {topics.map((t) => (
+              <option key={t.key} value={t.key}>
+                {t.title}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={handleRandomizeTopic}
+            style={{ ...btnPrimary, background: "#2563eb", padding: "8px 12px" }}
+            disabled={topics.length <= 1}
+          >
+            Randomize
+          </button>
+        </div>
+
+        {selectedTopic && (
+          <p style={{ marginTop: 10, color: "#334155", fontSize: 14 }}>
+            <strong>Prompt:</strong> {selectedTopic.prompt}
+          </p>
+        )}
+
+        {selectedTopicKey !== "free_talk" && topicHistory.length > 0 && (
+          <div style={{ marginTop: 12, padding: 12, borderRadius: 8, background: "#f8fafc", border: "1px solid #e2e8f0" }}>
+            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6, color: "#334155" }}>
+              Previous attempts for this topic
+            </div>
+            {topicHistory.slice(0, 3).map((attempt) => (
+              <div key={attempt.id} style={{ fontSize: 13, color: "#475569", marginBottom: 4 }}>
+                {attempt.date} · Mistakes: {attempt.mistake_count}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* ===== RECORD TAB ===== */}
       {tab === "record" && (
         <div>
           <div style={sectionStyle}>
@@ -207,7 +387,8 @@ export default function Landing() {
                 display: "flex",
                 gap: 12,
                 alignItems: "center",
-                marginBottom: 16,
+                marginBottom: 12,
+                flexWrap: "wrap",
               }}
             >
               <AudioRecorder
@@ -215,6 +396,9 @@ export default function Landing() {
                 onStatusChange={handleStatusChange}
                 language={language}
               />
+              <div style={{ fontSize: 14, color: "#475569" }}>
+                Timer: <strong>{formatDuration(elapsedSec)}</strong>
+              </div>
               {!isRecording && liveTranscript.length > 0 && (
                 <button
                   onClick={handleAnalyzeRecording}
@@ -236,6 +420,10 @@ export default function Landing() {
                 </button>
               )}
             </div>
+
+            {durationHint && (
+              <p style={{ marginBottom: 8, fontSize: 13, color: "#475569" }}>{durationHint}</p>
+            )}
 
             <TranscriptDisplay transcript={liveTranscript} isRecording={isRecording} />
 
@@ -259,7 +447,6 @@ export default function Landing() {
         </div>
       )}
 
-      {/* ===== UPLOAD TAB ===== */}
       {tab === "upload" && (
         <div>
           <div style={sectionStyle}>
@@ -299,9 +486,7 @@ export default function Landing() {
             <button
               onClick={handleUploadAnalyze}
               disabled={!uploadFile || uploadAnalyzing}
-              style={
-                !uploadFile || uploadAnalyzing ? btnDisabled : btnPrimary
-              }
+              style={!uploadFile || uploadAnalyzing ? btnDisabled : btnPrimary}
             >
               {uploadAnalyzing ? "Analyzing..." : "Upload & Analyze"}
             </button>

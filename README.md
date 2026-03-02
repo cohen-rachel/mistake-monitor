@@ -148,7 +148,8 @@ pip install asyncpg
 | `WS` | `/api/transcribe/stream` | Real-time audio transcription via WebSocket |
 | `POST` | `/api/analyze` | Run LLM analysis on a session |
 | `GET` | `/api/insights` | Get aggregated mistake insights & trends |
-| `POST` | `/api/practice` | Generate practice prompts (placeholder) |
+| `GET` | `/api/topics` | Topic suggestions based on estimated level |
+| `GET` | `/api/topics/history` | Historical attempts for a specific topic |
 | `GET` | `/api/health` | Health check |
 
 Interactive API docs available at **http://localhost:8000/docs** (Swagger UI).
@@ -160,7 +161,6 @@ Interactive API docs available at **http://localhost:8000/docs** (Swagger UI).
 | `/` | Home — Record audio (real-time transcription) or upload a file |
 | `/history` | Browse past sessions with transcripts and analysis |
 | `/insights` | Top mistakes, error trend chart, and recent corrections list |
-| `/practice` | Practice exercises (coming soon) |
 
 ## Language-Aware Analysis
 

@@ -13,6 +13,7 @@ from app.models import (
     User,
     UserLanguageProfile,
     SessionLanguageProfile,
+    PracticeAttempt,
 )
 from app.schemas import SessionCreate, SessionOut, SessionDetailOut, SessionListOut
 from app.services.stt.factory import get_stt_provider
@@ -40,6 +41,10 @@ async def create_session(
     language: str = Form("en"),
     user_id: Optional[int] = Form(None),
     transcript_text: Optional[str] = Form(None),
+    practice_topic_key: Optional[str] = Form(None),
+    practice_topic_text: Optional[str] = Form(None),
+    is_free_talk: bool = Form(False),
+    estimated_level: Optional[str] = Form(None),
     db: AsyncSession = Depends(get_db),
 ):
     """Create a new session.
@@ -133,6 +138,20 @@ async def create_session(
         tokens_with_timestamps=tokens_with_timestamps,
     )
     db.add(transcript)
+
+    # Persist practice metadata for this spoken answer when provided.
+    if practice_topic_key or is_free_talk:
+        db.add(
+            PracticeAttempt(
+                user_id=user_id,
+                session_id=session.id,
+                language=language,
+                topic_key=practice_topic_key or "free_talk",
+                topic_text=practice_topic_text or "Speak freely about any topic.",
+                is_free_talk=is_free_talk,
+                estimated_level=estimated_level,
+            )
+        )
     await db.commit()
 
     # If audio file was uploaded, auto-analyze

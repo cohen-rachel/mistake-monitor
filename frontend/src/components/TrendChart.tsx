@@ -46,10 +46,8 @@ export default function TrendChart({ trends }: Props) {
   }
 
   // Pivot: group by session date, with one key per mistake_type_code
-  const sessionMap = new Map<
-    string,
-    Record<string, number> & { date: string }
-  >();
+  type ChartRow = { date: string; [key: string]: number | string };
+  const sessionMap = new Map<string, ChartRow>();
   const allTypes = new Set<string>();
 
   for (const t of trends) {

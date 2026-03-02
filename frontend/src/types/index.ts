@@ -46,6 +46,13 @@ export interface SessionOut {
   status: string;
 }
 
+export interface PracticeSelection {
+  topic_key: string;
+  topic_text: string;
+  is_free_talk: boolean;
+  estimated_level?: string;
+}
+
 export interface SessionDetailOut extends SessionOut {
   transcript?: TranscriptOut;
   mistakes: MistakeOut[];
@@ -107,6 +114,36 @@ export interface PracticePrompt {
 export interface PracticeResponse {
   mistake_type_code: string;
   prompts: PracticePrompt[];
+}
+
+export interface TopicItem {
+  key: string;
+  title: string;
+  prompt: string;
+  level: string;
+}
+
+export interface TopicListResponse {
+  estimated_level: string;
+  topics: TopicItem[];
+}
+
+export interface TopicAttemptItem {
+  id: number;
+  session_id: number;
+  date: string;
+  language: string;
+  topic_key: string;
+  topic_text: string;
+  is_free_talk: boolean;
+  estimated_level?: string;
+  mistake_count: number;
+  transcript: string;
+}
+
+export interface TopicHistoryResponse {
+  topic_key: string;
+  attempts: TopicAttemptItem[];
 }
 
 /* WebSocket transcript chunk message */

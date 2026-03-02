@@ -37,9 +37,6 @@ export default function Navbar() {
       <NavLink to="/insights" style={linkStyle}>
         Insights
       </NavLink>
-      <NavLink to="/practice" style={linkStyle}>
-        Practice
-      </NavLink>
     </nav>
   );
 }
