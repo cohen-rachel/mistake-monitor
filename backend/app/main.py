@@ -10,7 +10,17 @@ from app.database import engine, Base, async_session_factory
 from app.seed import seed_mistake_types
 from app.api import sessions, transcribe, analyze, insights, practice
 
-logging.basicConfig(level=logging.INFO)
+# logging.basicConfig(level=logging.DEBUG)
+
+# Configure logging to file and console
+logging.basicConfig(
+    level=logging.INFO, # This sets the minimum level for all handlers
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler("debug.log"), 
+        logging.StreamHandler() 
+    ]
+)
 logger = logging.getLogger(__name__)
 
 

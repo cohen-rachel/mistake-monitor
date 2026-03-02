@@ -84,6 +84,7 @@ class WhisperLocalProvider(STTProvider):
 
             text = " ".join(full_text_parts)
             avg_conf = sum(s.confidence for s in segments) / len(segments) if segments else 0.0
+            logger.info(f"STT Output (Language: {language}): \"{text}\" (Avg Confidence: {avg_conf:.2f})") # ADD THIS LINE
             return TranscriptResult(text=text, segments=segments, average_confidence=avg_conf)
         except Exception as e:
             logger.error(f"faster-whisper transcription failed: {e}")

@@ -122,6 +122,9 @@ def _parse_llm_response(raw: str) -> list[LLMMistake]:
         start = text.find("{")
         end = text.rfind("}") + 1
         if start >= 0 and end > start:
+            logger.warning(
+                f"Extracted partial JSON from LLM response: {text[start:end][:500]}..."
+            )
             data = json.loads(text[start:end])
         else:
             logger.error(f"Could not parse LLM response as JSON: {text[:200]}")
@@ -187,12 +190,16 @@ async def analyze_transcript(
     user_prompt = _build_user_prompt(transcript_text, session.language, prior_summary)
     system_prompt = SYSTEM_PROMPT_BY_LANGUAGE.get(session.language, DEFAULT_SYSTEM_PROMPT)
     llm = get_llm_provider()
+    logger.info(f"LLM System Prompt (Language: {session.language}): \"\"\"{system_prompt}\"\"\"") # ADD THIS LINE
+    logger.info(f"LLM User Prompt: \"\"\"{user_prompt}\"\"\"") # ADD THIS LINE
 
     try:
         raw_response = await llm.complete(system_prompt, user_prompt)
+        logger.info(f"LLM Raw Response: {raw_response[:500]}...") # ADD THIS LINE (truncated to 500 chars)
         llm_mistakes = _parse_llm_response(raw_response)
     except Exception as e:
         logger.error(f"LLM analysis failed: {e}")
+        session.status = "error" 
         llm_mistakes = []
 
     # Store mistakes

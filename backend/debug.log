@@ -1,0 +1,137 @@
+2026-03-02 20:59:58,385 - app.main - INFO - Database tables created
+2026-03-02 20:59:58,403 - app.main - INFO - Mistake types seeded
+2026-03-02 20:59:58,604 - app.main - INFO - Database engine disposed
+2026-03-02 20:59:58,929 - app.main - INFO - Database tables created
+2026-03-02 20:59:58,945 - app.main - INFO - Mistake types seeded
+2026-03-02 21:00:14,512 - app.main - INFO - Database engine disposed
+2026-03-02 21:00:19,271 - app.main - INFO - Database tables created
+2026-03-02 21:00:19,287 - app.main - INFO - Mistake types seeded
+2026-03-02 21:00:28,822 - app.api.transcribe - INFO - WebSocket client disconnected
+2026-03-02 21:00:35,652 - app.services.stt.whisper_local - INFO - Loading faster-whisper model 'base' (first load downloads ~140MB)...
+2026-03-02 21:00:36,151 - app.services.stt.whisper_local - INFO - faster-whisper model loaded.
+2026-03-02 21:00:36,193 - faster_whisper - INFO - Processing audio with duration 00:02.940
+2026-03-02 21:00:36,226 - faster_whisper - INFO - VAD filter removed 00:00.048 of audio
+2026-03-02 21:00:36,841 - app.services.stt.whisper_local - INFO - STT Output (Language: es): "Hola, es mi, mi asio." (Avg Confidence: 0.35)
+2026-03-02 21:00:37,704 - faster_whisper - INFO - Processing audio with duration 00:06.000
+2026-03-02 21:00:37,723 - faster_whisper - INFO - VAD filter removed 00:01.616 of audio
+2026-03-02 21:00:38,379 - app.services.stt.whisper_local - INFO - STT Output (Language: es): "Hola, es mi, mi asio. ¿Qué tal?" (Avg Confidence: 0.46)
+2026-03-02 21:00:40,711 - faster_whisper - INFO - Processing audio with duration 00:09.000
+2026-03-02 21:00:40,739 - faster_whisper - INFO - VAD filter removed 00:02.224 of audio
+2026-03-02 21:00:41,497 - app.services.stt.whisper_local - INFO - STT Output (Language: es): "Hola, es mi, mi asio. ¿Qué tal? ¿Tú me..." (Avg Confidence: 0.21)
+2026-03-02 21:00:43,775 - faster_whisper - INFO - Processing audio with duration 00:12.060
+2026-03-02 21:00:43,810 - faster_whisper - INFO - VAD filter removed 00:02.556 of audio
+2026-03-02 21:00:44,599 - app.services.stt.whisper_local - INFO - STT Output (Language: es): "Hola, es mi, mi asio. ¿Qué tal? ¿Tú me tengo una fruta?" (Avg Confidence: 0.55)
+2026-03-02 21:00:46,836 - faster_whisper - INFO - Processing audio with duration 00:15.120
+2026-03-02 21:00:46,879 - faster_whisper - INFO - VAD filter removed 00:05.616 of audio
+2026-03-02 21:00:47,680 - app.services.stt.whisper_local - INFO - STT Output (Language: es): "Hola, es mi, mi asio. ¿Qué tal? ¿Tú me tengo una fruta?" (Avg Confidence: 0.55)
+2026-03-02 21:00:49,822 - faster_whisper - INFO - Processing audio with duration 00:18.120
+2026-03-02 21:00:49,873 - faster_whisper - INFO - VAD filter removed 00:07.144 of audio
+2026-03-02 21:00:50,835 - app.services.stt.whisper_local - INFO - STT Output (Language: es): "Hola, es mi. Mi asió. ¿Qué tal? ¿Tú me tengo una fruta? Sí." (Avg Confidence: 0.51)
+2026-03-02 21:00:52,846 - faster_whisper - INFO - Processing audio with duration 00:21.120
+2026-03-02 21:00:52,905 - faster_whisper - INFO - VAD filter removed 00:07.952 of audio
+2026-03-02 21:00:53,751 - app.services.stt.whisper_local - INFO - STT Output (Language: es): "Hola, es mi. Mi asio. ¿Qué tal? ¿Tú me tengo una fruta? Si es el..." (Avg Confidence: 0.53)
+2026-03-02 21:00:55,908 - faster_whisper - INFO - Processing audio with duration 00:24.180
+2026-03-02 21:00:55,977 - faster_whisper - INFO - VAD filter removed 00:09.072 of audio
+2026-03-02 21:00:56,871 - app.services.stt.whisper_local - INFO - STT Output (Language: es): "Hola, es mi, mi asio. ¿Qué tal? ¿Tú me tengo una fruta? Si es el lo puedo..." (Avg Confidence: 0.57)
+2026-03-02 21:00:58,962 - faster_whisper - INFO - Processing audio with duration 00:27.240
+2026-03-02 21:00:59,040 - faster_whisper - INFO - VAD filter removed 00:09.168 of audio
+2026-03-02 21:00:59,906 - app.services.stt.whisper_local - INFO - STT Output (Language: es): "Hola, es mi, mi asio. ¿Qué tal? ¿Tú me tengo una fruta? Si es el lo puedo hablar con mío." (Avg Confidence: 0.62)
+2026-03-02 21:01:01,450 - app.api.transcribe - INFO - WebSocket client disconnected
+2026-03-02 21:01:02,370 - app.services.analysis - INFO - LLM System Prompt (Language: es): """You are a Spanish grammar and pedagogy assistant focused on learner Spanish. Prioritize: verb conjugation and tense/aspect (preterito vs imperfecto), ser vs estar, por vs para, gender/number agreement, article usage, clitic pronouns (lo/la/le/se), reflexive constructions, prepositions, and common false-friend vocabulary. Do not over-correct regional but valid variants. When given a transcript string, output JSON exactly in the schema specified. For each suspected error, include type, span text, character indices, suggested correction, short pedagogical explanation (1-2 sentences), and confidence. Use canonical type codes: verb-tense, preposition, article, word-order, pronunciation, false-friend, pronoun, pluralization, vocabulary, subject-verb-agreement, other. If a token's STT confidence < 0.6, set "stt_uncertain": true. If you are uncertain whether something is an error, set "uncertain": true and provide a short reason. Output only valid JSON matching this schema: {"mistakes": [{"type": "str", "span_text": "str", "start_char": 0, "end_char": 0, "suggested_correction": "str", "explanation": "str", "confidence": 0.0, "stt_uncertain": false, "uncertain": false, "uncertain_reason": null}]}"""
+2026-03-02 21:01:02,371 - app.services.analysis - INFO - LLM User Prompt: """Language code: es
+Transcript: "Hola, es mi, mi asio. ¿Qué tal? ¿Tú me tengo una fruta? Si es el lo puedo hablar con mío.""""
+2026-03-02 21:01:53,042 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/chat "HTTP/1.1 200 OK"
+2026-03-02 21:01:53,047 - app.services.analysis - INFO - LLM Raw Response: {"mistakes": [
+{
+"type": "verb-tense",
+"span_text": "mi asio",
+"start_char": 8,
+"end_char": 11,
+"suggested_correction": "mi asistio",
+"explanation": "The verb 'asistir' is in the preterite tense and should be conjugated correctly.",
+"confidence": 0.9
+},
+{
+"type": "pronoun",
+"span_text": "mío",
+"start_char": 43,
+"end_char": 45,
+"suggested_correction": "mía",
+"explanation": "The possessive adjective 'mío' is incorrect and should be replaced with the correct feminine form.",
+"confidence": 0.8
+},
+{
+...
+2026-03-02 21:01:53,051 - app.services.analysis - ERROR - LLM analysis failed: 6 validation errors for AnalysisResult
+mistakes.3.suggested_correction
+  Input should be a valid string [type=string_type, input_value=None, input_type=NoneType]
+    For further information visit https://errors.pydantic.dev/2.11/v/string_type
+mistakes.4.span_text
+  Input should be a valid string [type=string_type, input_value=None, input_type=NoneType]
+    For further information visit https://errors.pydantic.dev/2.11/v/string_type
+mistakes.4.start_char
+  Input should be a valid integer [type=int_type, input_value=None, input_type=NoneType]
+    For further information visit https://errors.pydantic.dev/2.11/v/int_type
+mistakes.4.end_char
+  Input should be a valid integer [type=int_type, input_value=None, input_type=NoneType]
+    For further information visit https://errors.pydantic.dev/2.11/v/int_type
+mistakes.4.suggested_correction
+  Input should be a valid string [type=string_type, input_value=None, input_type=NoneType]
+    For further information visit https://errors.pydantic.dev/2.11/v/string_type
+mistakes.4.confidence
+  Input should be a valid number [type=float_type, input_value=None, input_type=NoneType]
+    For further information visit https://errors.pydantic.dev/2.11/v/float_type
+2026-03-02 21:14:07,751 - app.main - INFO - Database engine disposed
+2026-03-02 21:14:23,286 - app.main - INFO - Database tables created
+2026-03-02 21:14:23,304 - app.main - INFO - Mistake types seeded
+2026-03-02 21:14:57,482 - app.main - INFO - Database engine disposed
+2026-03-02 21:15:01,700 - app.main - INFO - Database tables created
+2026-03-02 21:15:01,717 - app.main - INFO - Mistake types seeded
+2026-03-02 21:15:03,232 - app.main - INFO - Database engine disposed
+2026-03-02 21:15:03,590 - app.main - INFO - Database tables created
+2026-03-02 21:15:03,608 - app.main - INFO - Mistake types seeded
+2026-03-02 21:15:37,881 - app.main - INFO - Database engine disposed
+2026-03-02 21:15:38,304 - app.main - INFO - Database tables created
+2026-03-02 21:15:38,323 - app.main - INFO - Mistake types seeded
+2026-03-02 21:15:41,863 - app.main - INFO - Database engine disposed
+2026-03-02 21:15:42,205 - app.main - INFO - Database tables created
+2026-03-02 21:15:42,222 - app.main - INFO - Mistake types seeded
+2026-03-02 21:15:44,651 - app.main - INFO - Database engine disposed
+2026-03-02 21:15:45,808 - app.main - INFO - Database tables created
+2026-03-02 21:15:45,825 - app.main - INFO - Mistake types seeded
+2026-03-02 21:15:53,279 - app.services.stt.whisper_local - INFO - Loading faster-whisper model 'base' (first load downloads ~140MB)...
+2026-03-02 21:15:53,863 - app.services.stt.whisper_local - INFO - faster-whisper model loaded.
+2026-03-02 21:15:53,905 - faster_whisper - INFO - Processing audio with duration 00:02.940
+2026-03-02 21:15:53,939 - faster_whisper - INFO - VAD filter removed 00:00.176 of audio
+2026-03-02 21:15:54,571 - app.services.stt.whisper_local - INFO - STT Output (Language: es): "Hola, hola, ¿tú me encuentes?" (Avg Confidence: 0.20)
+2026-03-02 21:15:55,238 - faster_whisper - INFO - Processing audio with duration 00:05.940
+2026-03-02 21:15:55,257 - faster_whisper - INFO - VAD filter removed 00:00.304 of audio
+2026-03-02 21:15:55,932 - app.services.stt.whisper_local - INFO - STT Output (Language: es): "Hola hola, tu me enquiendes, tu moren..." (Avg Confidence: 0.02)
+2026-03-02 21:15:58,298 - faster_whisper - INFO - Processing audio with duration 00:09.000
+2026-03-02 21:15:58,326 - faster_whisper - INFO - VAD filter removed 00:01.896 of audio
+2026-03-02 21:15:59,059 - app.services.stt.whisper_local - INFO - STT Output (Language: es): "Hola, hola. ¿Tú me entiendes? ¿Tú más entiendo?" (Avg Confidence: 0.41)
+2026-03-02 21:16:01,308 - faster_whisper - INFO - Processing audio with duration 00:12.000
+2026-03-02 21:16:01,343 - faster_whisper - INFO - VAD filter removed 00:04.896 of audio
+2026-03-02 21:16:02,085 - app.services.stt.whisper_local - INFO - STT Output (Language: es): "Hola, hola. ¿Tú me entiendes? ¿Tú más entiendo?" (Avg Confidence: 0.41)
+2026-03-02 21:16:04,309 - faster_whisper - INFO - Processing audio with duration 00:15.000
+2026-03-02 21:16:04,353 - faster_whisper - INFO - VAD filter removed 00:05.712 of audio
+2026-03-02 21:16:05,169 - app.services.stt.whisper_local - INFO - STT Output (Language: es): "Hola, hola. ¿Tú me entiendes? ¿Tú me entiendo? Mi nombre soy..." (Avg Confidence: 0.42)
+2026-03-02 21:16:07,375 - faster_whisper - INFO - Processing audio with duration 00:18.060
+2026-03-02 21:16:07,427 - faster_whisper - INFO - VAD filter removed 00:06.892 of audio
+2026-03-02 21:16:08,294 - app.services.stt.whisper_local - INFO - STT Output (Language: es): "Hola, hola. ¿Tú me entiendes? ¿Tú me entiendo? Mi nombre soy Raquel." (Avg Confidence: 0.54)
+2026-03-02 21:16:09,580 - app.api.transcribe - INFO - WebSocket client disconnected
+2026-03-02 21:16:10,714 - app.services.analysis - INFO - LLM System Prompt (Language: es): """You are a Spanish grammar and pedagogy assistant focused on learner Spanish. Prioritize: verb conjugation and tense/aspect (preterito vs imperfecto), ser vs estar, por vs para, gender/number agreement, article usage, clitic pronouns (lo/la/le/se), reflexive constructions, prepositions, and common false-friend vocabulary. Do not over-correct regional but valid variants. When given a transcript string, output JSON exactly in the schema specified. For each suspected error, include type, span text, character indices, suggested correction, short pedagogical explanation (1-2 sentences), and confidence. Use canonical type codes: verb-tense, preposition, article, word-order, pronunciation, false-friend, pronoun, pluralization, vocabulary, subject-verb-agreement, other. If a token's STT confidence < 0.6, set "stt_uncertain": true. If you are uncertain whether something is an error, set "uncertain": true and provide a short reason. Output only valid JSON matching this schema: {"mistakes": [{"type": "str", "span_text": "str", "start_char": 0, "end_char": 0, "suggested_correction": "str", "explanation": "str", "confidence": 0.0, "stt_uncertain": false, "uncertain": false, "uncertain_reason": null}]}"""
+2026-03-02 21:16:10,714 - app.services.analysis - INFO - LLM User Prompt: """Language code: es
+Transcript: "Hola, hola. ¿Tú me entiendes? ¿Tú me entiendo? Mi nombre soy Raquel.""""
+2026-03-02 21:16:33,356 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/chat "HTTP/1.1 200 OK"
+2026-03-02 21:16:33,360 - app.services.analysis - INFO - LLM Raw Response: {"mistakes": [
+  {
+    "type": "verb-tense",
+    "span_text": "Mi nombre soy Raquel.",
+    "start_char": 11,
+    "end_char": 14,
+    "suggested_correction": "Mi nombre es Raquel.",
+    "explanation": "In Spanish, the verb 'ser' is used to describe permanent characteristics or identities, and it requires the verb in the third person singular form. In this case, 'soy' should be replaced with 'es'.",
+    "confidence": 0.9
+  }
+]}...

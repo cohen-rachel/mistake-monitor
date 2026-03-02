@@ -90,6 +90,12 @@ class LLMMistake(BaseModel):
     suggested_correction: str
     explanation: str
     confidence: float
+    span_text: Optional[str] = None
+    start_char: Optional[int] = None
+    end_char: Optional[int] = None
+    suggested_correction: Optional[str] = None
+    explanation: Optional[str] = None
+    confidence: Optional[float] = None
     stt_uncertain: bool = False
     uncertain: bool = False
     uncertain_reason: Optional[str] = None
