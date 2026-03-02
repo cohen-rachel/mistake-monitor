@@ -11,6 +11,9 @@ import type {
   TopicListResponse,
   TopicHistoryResponse,
   PracticeSelection,
+  RewriteExerciseResponse,
+  RewriteStatsResponse,
+  RewriteSubmitResponse,
 } from "../types";
 
 const API_BASE = "/api";
@@ -97,10 +100,12 @@ export async function analyzeSession(
 
 export async function getInsights(
   topK: number = 10,
-  recentN: number = 20
+  recentN: number = 20,
+  language?: string
 ): Promise<InsightsResponse> {
+  const languageQuery = language ? `&language=${encodeURIComponent(language)}` : "";
   return request<InsightsResponse>(
-    `/insights?top_k=${topK}&recent_n=${recentN}`
+    `/insights?top_k=${topK}&recent_n=${recentN}${languageQuery}`
   );
 }
 
@@ -119,6 +124,44 @@ export async function getTopicHistory(
 ): Promise<TopicHistoryResponse> {
   return request<TopicHistoryResponse>(
     `/topics/history?topic_key=${encodeURIComponent(topicKey)}&language=${encodeURIComponent(language)}&user_id=${userId}`
+  );
+}
+
+// ---------- Rewrite Training ----------
+
+export async function getRewriteExercise(
+  language: string,
+  userId: number = 1
+): Promise<RewriteExerciseResponse> {
+  return request<RewriteExerciseResponse>(
+    `/rewrite/next?language=${encodeURIComponent(language)}&user_id=${userId}`
+  );
+}
+
+export async function submitRewriteExercise(
+  payload: {
+    user_id: number;
+    language: string;
+    source_mistake_id: number;
+    original_sentence: string;
+    wrong_span?: string;
+    expected_correction?: string;
+    user_rewrite: string;
+  }
+): Promise<RewriteSubmitResponse> {
+  return request<RewriteSubmitResponse>("/rewrite/submit", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function getRewriteStats(
+  language: string,
+  userId: number = 1
+): Promise<RewriteStatsResponse> {
+  return request<RewriteStatsResponse>(
+    `/rewrite/stats?language=${encodeURIComponent(language)}&user_id=${userId}`
   );
 }
 

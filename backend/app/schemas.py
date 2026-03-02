@@ -120,6 +120,14 @@ class TrendPoint(BaseModel):
     count: int
 
 
+class ProgressPoint(BaseModel):
+    session_id: int
+    date: str
+    word_count: int
+    mistake_count: int
+    error_rate_per_100_words: float
+
+
 class RecentMistakeItem(BaseModel):
     id: int
     session_id: int
@@ -137,6 +145,8 @@ class InsightsResponse(BaseModel):
     top_mistakes: list[MistakeCountItem]
     trends: list[TrendPoint]
     recent_mistakes: list[RecentMistakeItem]
+    progress: list[ProgressPoint]
+    improvement_banners: list[str]
 
 
 # ---------- Practice ----------
@@ -184,3 +194,49 @@ class TopicAttemptItem(BaseModel):
 class TopicHistoryResponse(BaseModel):
     topic_key: str
     attempts: list[TopicAttemptItem]
+
+
+# ---------- Rewrite Training ----------
+class RewriteExerciseResponse(BaseModel):
+    source_mistake_id: int
+    language: str
+    mistake_type_code: str
+    mistake_type_label: str
+    original_sentence: str
+    wrong_span: Optional[str] = None
+    expected_correction: Optional[str] = None
+    explanation_short: Optional[str] = None
+
+
+class RewriteSubmitRequest(BaseModel):
+    user_id: int = 1
+    language: str = "en"
+    source_mistake_id: int
+    original_sentence: str
+    wrong_span: Optional[str] = None
+    expected_correction: Optional[str] = None
+    user_rewrite: str
+
+
+class RewriteSubmitResponse(BaseModel):
+    is_correct: bool
+    score: float
+    feedback: str
+    expected_correction: Optional[str] = None
+
+
+class RewriteStatsItem(BaseModel):
+    wrong_span: Optional[str] = None
+    expected_correction: Optional[str] = None
+    attempts: int
+    correct_attempts: int
+    accuracy: float
+    latest_result: Optional[bool] = None
+    latest_date: Optional[str] = None
+
+
+class RewriteStatsResponse(BaseModel):
+    total_attempts: int
+    total_correct: int
+    overall_accuracy: float
+    recent_attempts: list[RewriteStatsItem]

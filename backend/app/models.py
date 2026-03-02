@@ -30,6 +30,7 @@ class User(Base):
     sessions = relationship("Session", back_populates="user", lazy="selectin")
     language_profiles = relationship("UserLanguageProfile", back_populates="user", lazy="selectin")
     practice_attempts = relationship("PracticeAttempt", back_populates="user", lazy="selectin")
+    rewrite_attempts = relationship("RewriteAttempt", back_populates="user", lazy="selectin")
 
 
 class Session(Base):
@@ -133,6 +134,7 @@ class Mistake(Base):
 
     session = relationship("Session", back_populates="mistakes")
     mistake_type = relationship("MistakeType", back_populates="mistakes", lazy="selectin")
+    rewrite_attempts = relationship("RewriteAttempt", back_populates="source_mistake", lazy="selectin")
 
 
 class PracticeAttempt(Base):
@@ -151,3 +153,23 @@ class PracticeAttempt(Base):
 
     user = relationship("User", back_populates="practice_attempts")
     session = relationship("Session", back_populates="practice_attempt")
+
+
+class RewriteAttempt(Base):
+    """Tracks user rewrite-training attempts for specific mistake instances over time."""
+    __tablename__ = "rewrite_attempts"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    language = Column(String(10), nullable=False, default="en", index=True)
+    source_mistake_id = Column(Integer, ForeignKey("mistakes.id"), nullable=False, index=True)
+    original_sentence = Column(Text, nullable=False)
+    wrong_span = Column(String(500), nullable=True)
+    expected_correction = Column(String(500), nullable=True)
+    user_rewrite = Column(Text, nullable=False)
+    is_correct = Column(Boolean, default=False, nullable=False, index=True)
+    score = Column(Float, nullable=False, default=0.0)
+    created_at = Column(DateTime, default=utcnow, nullable=False)
+
+    user = relationship("User", back_populates="rewrite_attempts")
+    source_mistake = relationship("Mistake", back_populates="rewrite_attempts")

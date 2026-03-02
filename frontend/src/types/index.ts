@@ -87,6 +87,14 @@ export interface TrendPoint {
   count: number;
 }
 
+export interface ProgressPoint {
+  session_id: number;
+  date: string;
+  word_count: number;
+  mistake_count: number;
+  error_rate_per_100_words: number;
+}
+
 export interface RecentMistakeItem {
   id: number;
   session_id: number;
@@ -104,6 +112,8 @@ export interface InsightsResponse {
   top_mistakes: MistakeCountItem[];
   trends: TrendPoint[];
   recent_mistakes: RecentMistakeItem[];
+  progress: ProgressPoint[];
+  improvement_banners: string[];
 }
 
 export interface PracticePrompt {
@@ -144,6 +154,41 @@ export interface TopicAttemptItem {
 export interface TopicHistoryResponse {
   topic_key: string;
   attempts: TopicAttemptItem[];
+}
+
+export interface RewriteExerciseResponse {
+  source_mistake_id: number;
+  language: string;
+  mistake_type_code: string;
+  mistake_type_label: string;
+  original_sentence: string;
+  wrong_span?: string;
+  expected_correction?: string;
+  explanation_short?: string;
+}
+
+export interface RewriteSubmitResponse {
+  is_correct: boolean;
+  score: number;
+  feedback: string;
+  expected_correction?: string;
+}
+
+export interface RewriteStatsItem {
+  wrong_span?: string;
+  expected_correction?: string;
+  attempts: number;
+  correct_attempts: number;
+  accuracy: number;
+  latest_result?: boolean;
+  latest_date?: string;
+}
+
+export interface RewriteStatsResponse {
+  total_attempts: number;
+  total_correct: number;
+  overall_accuracy: number;
+  recent_attempts: RewriteStatsItem[];
 }
 
 /* WebSocket transcript chunk message */

@@ -5,12 +5,13 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.models import Mistake, MistakeType, Session, Transcript
+from app.models import Mistake, MistakeType, Session, Transcript, RewriteAttempt
 from app.schemas import (
     InsightsResponse,
     MistakeCountItem,
     TrendPoint,
     RecentMistakeItem,
+    ProgressPoint,
 )
 
 router = APIRouter(prefix="/api/insights", tags=["insights"])
@@ -171,8 +172,71 @@ async def get_insights(
             )
         )
 
+    # 4. Session-level progress: error rate over time (mistakes per 100 words)
+    session_query = (
+        select(Session.id, Session.created_at, Transcript.raw_text)
+        .join(Transcript, Transcript.session_id == Session.id)
+        .order_by(Session.created_at)
+    )
+    if language:
+        session_query = session_query.where(Session.language == language)
+    session_result = await db.execute(session_query)
+    session_rows = session_result.all()
+
+    progress: list[ProgressPoint] = []
+    for session_id, created_at, raw_text in session_rows:
+        word_count = len((raw_text or "").split())
+        mistake_count_result = await db.execute(
+            select(func.count(Mistake.id)).where(Mistake.session_id == session_id)
+        )
+        mistake_count = mistake_count_result.scalar_one() or 0
+        error_rate = (mistake_count / word_count * 100) if word_count > 0 else 0.0
+        progress.append(
+            ProgressPoint(
+                session_id=session_id,
+                date=created_at.strftime("%Y-%m-%d %H:%M") if created_at else "",
+                word_count=word_count,
+                mistake_count=mistake_count,
+                error_rate_per_100_words=round(error_rate, 2),
+            )
+        )
+
+    # 5. Improvement banners from rewrite training wins.
+    improvement_banners: list[str] = []
+    rewrite_query = (
+        select(RewriteAttempt)
+        .order_by(RewriteAttempt.created_at.desc())
+        .limit(200)
+    )
+    if language:
+        rewrite_query = rewrite_query.where(RewriteAttempt.language == language)
+    rewrite_result = await db.execute(rewrite_query)
+    rewrite_attempts = rewrite_result.scalars().all()
+
+    # Group by mistake pair and check for "was wrong before, now correct" pattern.
+    grouped: dict[tuple[str, str], list[RewriteAttempt]] = {}
+    for attempt in rewrite_attempts:
+        wrong = (attempt.wrong_span or "").strip()
+        corr = (attempt.expected_correction or "").strip()
+        if not wrong or not corr:
+            continue
+        grouped.setdefault((wrong, corr), []).append(attempt)
+
+    for (wrong, corr), attempts in grouped.items():
+        ordered = sorted(attempts, key=lambda a: a.created_at)
+        had_wrong = any(not a.is_correct for a in ordered[:-1])
+        latest = ordered[-1]
+        if had_wrong and latest.is_correct:
+            improvement_banners.append(
+                f"Improvement win: You previously struggled with '{wrong}', and now corrected it to '{corr}'."
+            )
+        if len(improvement_banners) >= 3:
+            break
+
     return InsightsResponse(
         top_mistakes=top_mistakes,
         trends=trends,
         recent_mistakes=recent_mistakes,
+        progress=progress,
+        improvement_banners=improvement_banners,
     )

@@ -2,6 +2,17 @@ import { useEffect, useState } from "react";
 import { getInsights } from "../services/api";
 import TrendChart from "../components/TrendChart";
 import type { InsightsResponse } from "../types";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  LineChart,
+  Line,
+} from "recharts";
 
 const cardStyle: React.CSSProperties = {
   background: "#fff",
@@ -42,13 +53,14 @@ export default function Insights() {
   const [loading, setLoading] = useState(true);
   const [hoveredCode, setHoveredCode] = useState<string | null>(null);
   const [selectedMistakeId, setSelectedMistakeId] = useState<number | null>(null);
+  const [language, setLanguage] = useState("en");
 
   useEffect(() => {
-    getInsights(10, 30)
+    getInsights(10, 30, language)
       .then(setData)
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, []);
+  }, [language]);
 
   if (loading) {
     return <p style={{ color: "#94a3b8", textAlign: "center" }}>Loading...</p>;
@@ -70,6 +82,44 @@ export default function Insights() {
       <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 16 }}>
         Insights
       </h1>
+      <div style={{ marginBottom: 12 }}>
+        <label style={{ fontSize: 14, color: "#475569", marginRight: 8 }}>Language:</label>
+        <select
+          value={language}
+          onChange={(e) => setLanguage(e.target.value)}
+          style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid #cbd5e1" }}
+        >
+          <option value="en">English</option>
+          <option value="es">Spanish</option>
+          <option value="fr">French</option>
+          <option value="ja">Japanese</option>
+          <option value="de">German</option>
+          <option value="it">Italian</option>
+          <option value="pt">Portuguese</option>
+        </select>
+      </div>
+
+      {data.improvement_banners.length > 0 && (
+        <div style={{ marginBottom: 18 }}>
+          {data.improvement_banners.map((banner, idx) => (
+            <div
+              key={idx}
+              style={{
+                background: "#ecfdf5",
+                border: "1px solid #86efac",
+                color: "#166534",
+                borderRadius: 8,
+                padding: "10px 12px",
+                marginBottom: 8,
+                fontSize: 14,
+                fontWeight: 600,
+              }}
+            >
+              {banner}
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Top Mistakes */}
       <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 12 }}>
@@ -150,6 +200,58 @@ export default function Insights() {
       </h2>
       <div style={{ marginBottom: 24 }}>
         <TrendChart trends={data.trends} />
+      </div>
+
+      <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 12 }}>
+        Most Common Errors (Bar Chart)
+      </h2>
+      <div
+        style={{
+          marginBottom: 24,
+          background: "#fff",
+          border: "1px solid #e2e8f0",
+          borderRadius: 8,
+          padding: 16,
+        }}
+      >
+        <ResponsiveContainer width="100%" height={280}>
+          <BarChart data={data.top_mistakes}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+            <XAxis dataKey="label" fontSize={12} />
+            <YAxis allowDecimals={false} fontSize={12} />
+            <Tooltip />
+            <Bar dataKey="count" fill="#4338ca" />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+
+      <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 12 }}>
+        Improvement Over Time (Error Rate)
+      </h2>
+      <div
+        style={{
+          marginBottom: 24,
+          background: "#fff",
+          border: "1px solid #e2e8f0",
+          borderRadius: 8,
+          padding: 16,
+        }}
+      >
+        <ResponsiveContainer width="100%" height={280}>
+          <LineChart data={data.progress}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+            <XAxis dataKey="date" fontSize={12} />
+            <YAxis allowDecimals fontSize={12} />
+            <Tooltip />
+            <Line
+              type="monotone"
+              dataKey="error_rate_per_100_words"
+              stroke="#dc2626"
+              strokeWidth={2}
+              dot={{ r: 3 }}
+            />
+          </LineChart>
+        </ResponsiveContainer>
       </div>
 
       {/* Recent Mistakes */}

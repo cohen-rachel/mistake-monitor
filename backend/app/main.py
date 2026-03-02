@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import engine, Base, async_session_factory
 from app.seed import seed_mistake_types
-from app.api import sessions, transcribe, analyze, insights, topics
+from app.api import sessions, transcribe, analyze, insights, topics, rewrite
 
 # logging.basicConfig(level=logging.DEBUG)
 
@@ -66,6 +66,7 @@ app.include_router(transcribe.router)
 app.include_router(analyze.router)
 app.include_router(insights.router)
 app.include_router(topics.router)
+app.include_router(rewrite.router)
 
 
 @app.get("/api/health")

@@ -194,3 +194,30 @@ Prior mistake summary (top types with counts): verb-tense (17), pronoun (3), oth
 "end_char": 31,
 "suggested_correction": "We want to become good at sleeping",
 "explanation": "The subject 'We...
+2026-03-02 21:39:23,607 - app.main - INFO - Database engine disposed
+2026-03-02 21:39:24,467 - app.main - INFO - Database tables created
+2026-03-02 21:39:24,499 - app.main - INFO - Mistake types seeded
+2026-03-02 21:39:49,070 - app.main - INFO - Database engine disposed
+2026-03-02 21:39:49,660 - app.main - INFO - Database tables created
+2026-03-02 21:39:49,699 - app.main - INFO - Mistake types seeded
+2026-03-02 21:40:04,058 - app.main - INFO - Database engine disposed
+2026-03-02 21:40:04,675 - app.main - INFO - Database tables created
+2026-03-02 21:40:04,713 - app.main - INFO - Mistake types seeded
+2026-03-02 21:40:36,960 - app.main - INFO - Database engine disposed
+2026-03-02 21:40:37,538 - app.main - INFO - Database tables created
+2026-03-02 21:40:37,576 - app.main - INFO - Mistake types seeded
+2026-03-02 21:40:44,857 - app.main - INFO - Database engine disposed
+2026-03-02 21:40:45,453 - app.main - INFO - Database tables created
+2026-03-02 21:40:45,491 - app.main - INFO - Mistake types seeded
+2026-03-02 21:40:51,362 - app.main - INFO - Database engine disposed
+2026-03-02 21:40:51,953 - app.main - INFO - Database tables created
+2026-03-02 21:40:51,991 - app.main - INFO - Mistake types seeded
+2026-03-02 21:46:04,467 - app.main - INFO - Database engine disposed
+2026-03-02 21:46:05,048 - app.main - INFO - Database tables created
+2026-03-02 21:46:05,086 - app.main - INFO - Mistake types seeded
+2026-03-02 21:46:06,704 - app.main - INFO - Database engine disposed
+2026-03-02 21:46:07,260 - app.main - INFO - Database tables created
+2026-03-02 21:46:07,296 - app.main - INFO - Mistake types seeded
+2026-03-02 21:50:59,802 - app.main - INFO - Database engine disposed
+2026-03-02 21:51:01,155 - app.main - INFO - Database tables created
+2026-03-02 21:51:01,193 - app.main - INFO - Mistake types seeded

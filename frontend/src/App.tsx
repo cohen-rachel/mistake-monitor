@@ -3,6 +3,7 @@ import Navbar from "./components/Navbar";
 import Landing from "./pages/Landing";
 import History from "./pages/History";
 import Insights from "./pages/Insights";
+import Rewrite from "./pages/Rewrite";
 
 const globalStyles = `
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -26,6 +27,7 @@ export default function App() {
           <Route path="/" element={<Landing />} />
           <Route path="/history" element={<History />} />
           <Route path="/insights" element={<Insights />} />
+          <Route path="/rewrite" element={<Rewrite />} />
         </Routes>
       </main>
     </>

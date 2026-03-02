@@ -37,6 +37,9 @@ export default function Navbar() {
       <NavLink to="/insights" style={linkStyle}>
         Insights
       </NavLink>
+      <NavLink to="/rewrite" style={linkStyle}>
+        Rewrite
+      </NavLink>
     </nav>
   );
 }
