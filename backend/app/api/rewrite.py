@@ -7,7 +7,7 @@ from sqlalchemy import select, func, cast, Integer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.models import Mistake, MistakeType, Session, Transcript, RewriteAttempt, User
+from app.models import Mistake, MistakeType, Session, Transcript, RewriteAttempt, User, SessionLanguageProfile, UserLanguageProfile
 from app.schemas import (
     RewriteExerciseResponse,
     RewriteSubmitRequest,
@@ -90,7 +90,7 @@ def _evaluate_rewrite(
 
 @router.get("/next", response_model=RewriteExerciseResponse)
 async def next_exercise(
-    language: str = Query("en"),
+    language_code: str = Query(..., description="Language code to filter exercises"),
     user_id: int = Query(1, ge=1),
     db: AsyncSession = Depends(get_db),
 ):
@@ -111,8 +111,10 @@ async def next_exercise(
         .join(MistakeType, Mistake.mistake_type_id == MistakeType.id)
         .join(Session, Mistake.session_id == Session.id)
         .join(Transcript, Transcript.session_id == Session.id)
+        .join(SessionLanguageProfile, SessionLanguageProfile.session_id == Session.id)
+        .join(UserLanguageProfile, UserLanguageProfile.id == SessionLanguageProfile.language_profile_id)
         .outerjoin(subq, subq.c.source_mistake_id == Mistake.id)
-        .where(Session.user_id == user_id, Session.language == language)
+        .where(Session.user_id == user_id, UserLanguageProfile.language_code == language_code)
         .order_by(func.coalesce(subq.c.cnt, 0).asc(), Mistake.id.desc())
         .limit(1)
     )
@@ -126,7 +128,7 @@ async def next_exercise(
 
     return RewriteExerciseResponse(
         source_mistake_id=mistake.id,
-        language=session.language,
+        language=language_code,
         mistake_type_code=mtype.code,
         mistake_type_label=mtype.label,
         original_sentence=sentence,
@@ -153,7 +155,8 @@ async def submit_rewrite(req: RewriteSubmitRequest, db: AsyncSession = Depends(g
 
     attempt = RewriteAttempt(
         user_id=req.user_id,
-        language=req.language,
+        language=req.language_code,
+        language_code=req.language_code, 
         source_mistake_id=req.source_mistake_id,
         original_sentence=req.original_sentence,
         wrong_span=req.wrong_span,
@@ -175,14 +178,14 @@ async def submit_rewrite(req: RewriteSubmitRequest, db: AsyncSession = Depends(g
 
 @router.get("/stats", response_model=RewriteStatsResponse)
 async def rewrite_stats(
-    language: str = Query("en"),
+    language_code: str = Query(..., description="Language code to filter stats"),
     user_id: int = Query(1, ge=1),
     db: AsyncSession = Depends(get_db),
 ):
     """Return rewrite-training accuracy stats over time."""
     total_result = await db.execute(
         select(func.count(RewriteAttempt.id), func.coalesce(func.sum(cast(RewriteAttempt.is_correct, Integer)), 0))
-        .where(RewriteAttempt.user_id == user_id, RewriteAttempt.language == language)
+        .where(RewriteAttempt.user_id == user_id, RewriteAttempt.language_code == language_code)
     )
     total_attempts, total_correct = total_result.one()
     total_attempts = int(total_attempts or 0)
@@ -197,7 +200,7 @@ async def rewrite_stats(
             func.coalesce(func.sum(cast(RewriteAttempt.is_correct, Integer)), 0).label("correct"),
             func.max(RewriteAttempt.created_at).label("latest_date"),
         )
-        .where(RewriteAttempt.user_id == user_id, RewriteAttempt.language == language)
+        .where(RewriteAttempt.user_id == user_id, RewriteAttempt.language_code == language_code)
         .group_by(RewriteAttempt.wrong_span, RewriteAttempt.expected_correction)
         .order_by(func.max(RewriteAttempt.created_at).desc())
         .limit(20)
@@ -209,7 +212,7 @@ async def rewrite_stats(
             select(RewriteAttempt.is_correct)
             .where(
                 RewriteAttempt.user_id == user_id,
-                RewriteAttempt.language == language,
+                RewriteAttempt.language_code == language_code,
                 RewriteAttempt.wrong_span == wrong_span,
                 RewriteAttempt.expected_correction == expected,
             )

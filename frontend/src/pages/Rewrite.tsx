@@ -8,6 +8,7 @@ import type {
   RewriteExerciseResponse,
   RewriteStatsResponse,
 } from "../types";
+import { useLanguageContext } from "../contexts/LanguageContext";
 
 const cardStyle: React.CSSProperties = {
   background: "#fff",
@@ -28,7 +29,7 @@ const btnPrimary: React.CSSProperties = {
 };
 
 export default function Rewrite() {
-  const [language, setLanguage] = useState("en");
+  const { currentLanguageProfile, isLoadingLanguage } = useLanguageContext();
   const [exercise, setExercise] = useState<RewriteExerciseResponse | null>(null);
   const [stats, setStats] = useState<RewriteStatsResponse | null>(null);
   const [answer, setAnswer] = useState("");
@@ -36,11 +37,13 @@ export default function Rewrite() {
   const [loading, setLoading] = useState(false);
 
   const loadExercise = async () => {
+    if (!currentLanguageProfile) return;
+
     setLoading(true);
     setFeedback(null);
     setAnswer("");
     try {
-      const ex = await getRewriteExercise(language);
+      const ex = await getRewriteExercise(currentLanguageProfile.language_code);
       setExercise(ex);
     } catch {
       setExercise(null);
@@ -50,8 +53,10 @@ export default function Rewrite() {
   };
 
   const loadStats = async () => {
+    if (!currentLanguageProfile) return;
+
     try {
-      const st = await getRewriteStats(language);
+      const st = await getRewriteStats(currentLanguageProfile.language_code);
       setStats(st);
     } catch {
       setStats(null);
@@ -59,17 +64,19 @@ export default function Rewrite() {
   };
 
   useEffect(() => {
+    if (!currentLanguageProfile) return;
+
     loadExercise();
     loadStats();
-  }, [language]);
+  }, [currentLanguageProfile]);
 
   const handleSubmit = async () => {
-    if (!exercise || !answer.trim()) return;
+    if (!exercise || !answer.trim() || !currentLanguageProfile) return;
     setLoading(true);
     try {
       const result = await submitRewriteExercise({
         user_id: 1,
-        language,
+        language_code: currentLanguageProfile.language_code,
         source_mistake_id: exercise.source_mistake_id,
         original_sentence: exercise.original_sentence,
         wrong_span: exercise.wrong_span,
@@ -85,43 +92,38 @@ export default function Rewrite() {
       );
       await loadStats();
     } catch (err: any) {
-      setFeedback(`Error: ${err.message}`);
+      setFeedback(err?.message || "Could not submit rewrite.");
     } finally {
       setLoading(false);
     }
   };
 
+  if (isLoadingLanguage) {
+    return <p style={{ color: "#94a3b8", textAlign: "center" }}>Loading language profile...</p>;
+  }
+
+  if (!currentLanguageProfile) {
+    return (
+      <p style={{ color: "#94a3b8", textAlign: "center" }}>
+        Please select or create a language profile to start rewriting exercises.
+      </p>
+    );
+  }
+
   return (
     <div>
       <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 12 }}>
-        Rewrite Practice
+        Rewrite Practice ({currentLanguageProfile.display_name})
       </h1>
       <p style={{ color: "#64748b", marginBottom: 16 }}>
         You get your original incorrect sentence and rewrite it correctly.
       </p>
 
       <div style={cardStyle}>
-        <label style={{ fontSize: 14, color: "#475569", marginRight: 8 }}>
-          Language:
-        </label>
-        <select
-          value={language}
-          onChange={(e) => setLanguage(e.target.value)}
-          style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid #cbd5e1" }}
-        >
-          <option value="en">English</option>
-          <option value="es">Spanish</option>
-          <option value="fr">French</option>
-          <option value="ja">Japanese</option>
-          <option value="de">German</option>
-          <option value="it">Italian</option>
-          <option value="pt">Portuguese</option>
-        </select>
-      </div>
-
-      <div style={cardStyle}>
         <h3 style={{ marginBottom: 8 }}>Exercise</h3>
-        {exercise ? (
+        {loading && !exercise ? (
+          <p style={{ color: "#94a3b8" }}>Loading exercise...</p>
+        ) : exercise ? (
           <>
             <div style={{ fontSize: 13, color: "#64748b", marginBottom: 8 }}>
               {exercise.mistake_type_label}
@@ -168,7 +170,9 @@ export default function Rewrite() {
 
       <div style={cardStyle}>
         <h3 style={{ marginBottom: 8 }}>Rewrite Stats</h3>
-        {!stats ? (
+        {loading && !stats ? (
+          <p style={{ color: "#94a3b8" }}>Loading stats...</p>
+        ) : !stats ? (
           <p style={{ color: "#94a3b8" }}>No stats yet.</p>
         ) : (
           <>

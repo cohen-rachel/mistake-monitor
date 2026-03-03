@@ -201,3 +201,11 @@ export interface TranscriptChunk {
   confidence?: number;
   message?: string;
 }
+
+export interface UserLanguageProfileOut {
+  id: number;
+  user_id: number;
+  language_code: string;
+  display_name: string;
+  created_at: string;
+}

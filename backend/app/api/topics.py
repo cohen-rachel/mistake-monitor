@@ -7,7 +7,7 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.models import PracticeAttempt, Session, Transcript, Mistake
+from app.models import PracticeAttempt, Session, Transcript, Mistake, UserLanguageProfile, SessionLanguageProfile
 from app.schemas import TopicItem, TopicListResponse, TopicAttemptItem, TopicHistoryResponse
 
 router = APIRouter(prefix="/api/topics", tags=["topics"])
@@ -39,12 +39,14 @@ def _load_topics() -> list[TopicItem]:
     return topics
 
 
-async def _estimate_level(db: AsyncSession, user_id: int, language: str) -> str:
-    """Estimate learner level from recent mistake density."""
+async def _estimate_level(db: AsyncSession, user_id: int, language_code: str) -> str:
+    """Estimate learner level from recent mistake density for a specific language."""
     result = await db.execute(
         select(Session.id, Transcript.raw_text)
         .join(Transcript, Transcript.session_id == Session.id)
-        .where(Session.user_id == user_id, Session.language == language)
+        .join(SessionLanguageProfile, SessionLanguageProfile.session_id == Session.id)
+        .join(UserLanguageProfile, UserLanguageProfile.id == SessionLanguageProfile.language_profile_id)
+        .where(Session.user_id == user_id, UserLanguageProfile.language_code == language_code)
         .order_by(Session.created_at.desc())
         .limit(8)
     )
@@ -81,16 +83,16 @@ async def _estimate_level(db: AsyncSession, user_id: int, language: str) -> str:
 @router.get("", response_model=TopicListResponse)
 async def list_topics(
     user_id: int = Query(1, ge=1),
-    language: str = Query("en"),
+    language_code: str = Query(..., description="Language code to filter topics"),
     db: AsyncSession = Depends(get_db),
 ):
     """Return topic options chosen by estimated learner level plus free-talk option."""
-    estimated_level = await _estimate_level(db, user_id=user_id, language=language)
+    estimated_level = await _estimate_level(db, user_id=user_id, language_code=language_code)
     topics = _load_topics()
 
     filtered = [t for t in topics if t.level == estimated_level]
     if not filtered:
-        filtered = topics
+        filtered = [t for t in topics if t.level == "beginner"] # Fallback to beginner if no topics for estimated level
 
     free_talk = TopicItem(
         key="free_talk",
@@ -105,7 +107,7 @@ async def list_topics(
 async def topic_history(
     topic_key: str = Query(...),
     user_id: int = Query(1, ge=1),
-    language: str = Query("en"),
+    language_code: str = Query(..., description="Language code to filter history"),
     db: AsyncSession = Depends(get_db),
 ):
     """Return historical attempts for a given topic for month-over-month comparison."""
@@ -113,9 +115,11 @@ async def topic_history(
         select(PracticeAttempt, Session, Transcript)
         .join(Session, Session.id == PracticeAttempt.session_id)
         .join(Transcript, Transcript.session_id == Session.id)
+        .join(SessionLanguageProfile, SessionLanguageProfile.session_id == Session.id)
+        .join(UserLanguageProfile, UserLanguageProfile.id == SessionLanguageProfile.language_profile_id)
         .where(
             PracticeAttempt.user_id == user_id,
-            PracticeAttempt.language == language,
+            UserLanguageProfile.language_code == language_code,
             PracticeAttempt.topic_key == topic_key,
         )
         .order_by(PracticeAttempt.created_at.desc())

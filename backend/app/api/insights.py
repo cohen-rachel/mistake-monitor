@@ -5,7 +5,7 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.models import Mistake, MistakeType, Session, Transcript, RewriteAttempt
+from app.models import Mistake, MistakeType, Session, Transcript, RewriteAttempt, SessionLanguageProfile, UserLanguageProfile
 from app.schemas import (
     InsightsResponse,
     MistakeCountItem,
@@ -55,10 +55,10 @@ def _build_corrected_sentence(
 async def get_insights(
     top_k: int = Query(10, ge=1, le=50),
     recent_n: int = Query(20, ge=1, le=100),
-    language: str | None = Query(None, description="Optional language filter, e.g. fr/es/ja"),
+    language_profile_id: int = Query(..., description="Language profile ID to filter insights"),
     db: AsyncSession = Depends(get_db),
 ):
-    """Get aggregated mistake insights: top types, trends, and recent mistakes."""
+    """Get aggregated mistake insights: top types, trends, and recent mistakes for a given language profile."""
 
     # 1. Top K mistake types by count
     top_query = (
@@ -69,12 +69,13 @@ async def get_insights(
         )
         .join(Mistake, Mistake.mistake_type_id == MistakeType.id)
         .join(Session, Mistake.session_id == Session.id)
+        .join(SessionLanguageProfile, SessionLanguageProfile.session_id == Session.id)
+        .where(SessionLanguageProfile.language_profile_id == language_profile_id)
         .group_by(MistakeType.code, MistakeType.label)
         .order_by(func.count(Mistake.id).desc())
         .limit(top_k)
     )
-    if language:
-        top_query = top_query.where(Session.language == language)
+    
     top_result = await db.execute(top_query)
     top_rows = top_result.all()
     top_mistakes = []
@@ -84,12 +85,11 @@ async def get_insights(
             select(Mistake.explanation_short)
             .join(MistakeType, Mistake.mistake_type_id == MistakeType.id)
             .join(Session, Mistake.session_id == Session.id)
-            .where(MistakeType.code == code)
+            .join(SessionLanguageProfile, SessionLanguageProfile.session_id == Session.id)
+            .where(MistakeType.code == code, SessionLanguageProfile.language_profile_id == language_profile_id)
             .order_by(Mistake.id.desc())
             .limit(1)
         )
-        if language:
-            latest_query = latest_query.where(Session.language == language)
         latest_result = await db.execute(latest_query)
         latest_summary = latest_result.scalar_one_or_none()
 
@@ -117,11 +117,11 @@ async def get_insights(
         )
         .join(Mistake, Mistake.session_id == Session.id)
         .join(MistakeType, Mistake.mistake_type_id == MistakeType.id)
+        .join(SessionLanguageProfile, SessionLanguageProfile.session_id == Session.id)
+        .where(SessionLanguageProfile.language_profile_id == language_profile_id)
         .group_by(Session.id, Session.created_at, MistakeType.code)
         .order_by(Session.created_at)
     )
-    if language:
-        trend_query = trend_query.where(Session.language == language)
     trend_result = await db.execute(trend_query)
     trends = [
         TrendPoint(
@@ -139,11 +139,11 @@ async def get_insights(
         .join(MistakeType, Mistake.mistake_type_id == MistakeType.id)
         .join(Session, Mistake.session_id == Session.id)
         .join(Transcript, Transcript.session_id == Session.id)
+        .join(SessionLanguageProfile, SessionLanguageProfile.session_id == Session.id)
+        .where(SessionLanguageProfile.language_profile_id == language_profile_id)
         .order_by(Mistake.id.desc())
         .limit(recent_n)
     )
-    if language:
-        recent_query = recent_query.where(Session.language == language)
     recent_result = await db.execute(recent_query)
     recent_mistakes = []
     for mistake, mt, session, transcript in recent_result.all():
@@ -176,10 +176,10 @@ async def get_insights(
     session_query = (
         select(Session.id, Session.created_at, Transcript.raw_text)
         .join(Transcript, Transcript.session_id == Session.id)
+        .join(SessionLanguageProfile, SessionLanguageProfile.session_id == Session.id)
+        .where(SessionLanguageProfile.language_profile_id == language_profile_id)
         .order_by(Session.created_at)
     )
-    if language:
-        session_query = session_query.where(Session.language == language)
     session_result = await db.execute(session_query)
     session_rows = session_result.all()
 
@@ -203,35 +203,39 @@ async def get_insights(
 
     # 5. Improvement banners from rewrite training wins.
     improvement_banners: list[str] = []
-    rewrite_query = (
-        select(RewriteAttempt)
-        .order_by(RewriteAttempt.created_at.desc())
-        .limit(200)
+    profile_result = await db.execute(
+        select(UserLanguageProfile.language_code).where(UserLanguageProfile.id == language_profile_id)
     )
-    if language:
-        rewrite_query = rewrite_query.where(RewriteAttempt.language == language)
-    rewrite_result = await db.execute(rewrite_query)
-    rewrite_attempts = rewrite_result.scalars().all()
+    language_code = profile_result.scalar_one_or_none()
+    if language_code: #TODO: fix this to use new inputs
 
-    # Group by mistake pair and check for "was wrong before, now correct" pattern.
-    grouped: dict[tuple[str, str], list[RewriteAttempt]] = {}
-    for attempt in rewrite_attempts:
-        wrong = (attempt.wrong_span or "").strip()
-        corr = (attempt.expected_correction or "").strip()
-        if not wrong or not corr:
-            continue
-        grouped.setdefault((wrong, corr), []).append(attempt)
+        rewrite_query = (
+            select(RewriteAttempt)
+            .order_by(RewriteAttempt.created_at.desc())
+            .limit(200)
+        )
+        rewrite_result = await db.execute(rewrite_query)
+        rewrite_attempts = rewrite_result.scalars().all()
 
-    for (wrong, corr), attempts in grouped.items():
-        ordered = sorted(attempts, key=lambda a: a.created_at)
-        had_wrong = any(not a.is_correct for a in ordered[:-1])
-        latest = ordered[-1]
-        if had_wrong and latest.is_correct:
-            improvement_banners.append(
-                f"Improvement win: You previously struggled with '{wrong}', and now corrected it to '{corr}'."
-            )
-        if len(improvement_banners) >= 3:
-            break
+        # Group by mistake pair and check for "was wrong before, now correct" pattern.
+        grouped: dict[tuple[str, str], list[RewriteAttempt]] = {}
+        for attempt in rewrite_attempts:
+            wrong = (attempt.wrong_span or "").strip()
+            corr = (attempt.expected_correction or "").strip()
+            if not wrong or not corr:
+                continue
+            grouped.setdefault((wrong, corr), []).append(attempt)
+
+        for (wrong, corr), attempts in grouped.items():
+            ordered = sorted(attempts, key=lambda a: a.created_at)
+            had_wrong = any(not a.is_correct for a in ordered[:-1])
+            latest = ordered[-1]
+            if had_wrong and latest.is_correct:
+                improvement_banners.append(
+                    f"Improvement win: You previously struggled with '{wrong}', and now corrected it to '{corr}'."
+                )
+            if len(improvement_banners) >= 3:
+                break
 
     return InsightsResponse(
         top_mistakes=top_mistakes,

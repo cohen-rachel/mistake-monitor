@@ -38,7 +38,7 @@ def _language_display_name(language: str) -> str:
 @router.post("", response_model=SessionDetailOut)
 async def create_session(
     audio_file: Optional[UploadFile] = File(None),
-    language: str = Form("en"),
+    language_profile_id: int = Form(...), # Now required
     user_id: Optional[int] = Form(None),
     transcript_text: Optional[str] = Form(None),
     practice_topic_key: Optional[str] = Form(None),
@@ -69,6 +69,12 @@ async def create_session(
             await db.flush()
         user_id = 1
 
+    # Fetch the language profile
+    language_profile = await db.get(UserLanguageProfile, language_profile_id)
+    if not language_profile or language_profile.user_id != user_id:
+        raise HTTPException(status_code=404, detail="Language profile not found or not owned by user")
+    language_code = language_profile.language_code
+
     stt_provider_name = settings.stt_provider
     stt_confidence = None
     tokens_with_timestamps = None
@@ -77,7 +83,7 @@ async def create_session(
     if audio_file and not transcript_text:
         audio_bytes = await audio_file.read()
         stt = get_stt_provider()
-        result = await stt.transcribe(audio_bytes, language)
+        result = await stt.transcribe(audio_bytes, language_code)
         transcript_text = result.text
         stt_confidence = result.average_confidence
         tokens_with_timestamps = [
@@ -99,7 +105,7 @@ async def create_session(
     # Create session
     session = Session(
         user_id=user_id,
-        language=language,
+        language=language_code,
         stt_provider=stt_provider_name,
         stt_confidence_summary=stt_confidence,
         status="transcribed",
@@ -107,23 +113,7 @@ async def create_session(
     db.add(session)
     await db.flush()
 
-    # Ensure per-user language profile exists, then link the session to it.
-    profile_result = await db.execute(
-        select(UserLanguageProfile).where(
-            UserLanguageProfile.user_id == user_id,
-            UserLanguageProfile.language_code == language,
-        )
-    )
-    language_profile = profile_result.scalar_one_or_none()
-    if language_profile is None:
-        language_profile = UserLanguageProfile(
-            user_id=user_id,
-            language_code=language,
-            display_name=_language_display_name(language),
-        )
-        db.add(language_profile)
-        await db.flush()
-
+    # Link the session to the user's language profile
     db.add(
         SessionLanguageProfile(
             session_id=session.id,
@@ -145,7 +135,7 @@ async def create_session(
             PracticeAttempt(
                 user_id=user_id,
                 session_id=session.id,
-                language=language,
+                language=language_code,
                 topic_key=practice_topic_key or "free_talk",
                 topic_text=practice_topic_text or "Speak freely about any topic.",
                 is_free_talk=is_free_talk,
@@ -166,11 +156,18 @@ async def create_session(
 
 
 @router.get("", response_model=SessionListOut)
-async def list_sessions(db: AsyncSession = Depends(get_db)):
-    """List all sessions, most recent first."""
-    result = await db.execute(
-        select(Session).order_by(Session.created_at.desc())
-    )
+async def list_sessions(
+    language_profile_id: Optional[int] = None,
+    db: AsyncSession = Depends(get_db),
+):
+    """List all sessions for a given language profile, most recent first."""
+    stmt = select(Session)
+    if language_profile_id:
+        stmt = stmt.join(SessionLanguageProfile).where(
+            SessionLanguageProfile.language_profile_id == language_profile_id
+        )
+    stmt = stmt.order_by(Session.created_at.desc())
+    result = await db.execute(stmt)
     sessions = result.scalars().all()
     return SessionListOut(sessions=sessions)
 

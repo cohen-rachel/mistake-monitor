@@ -22,3 +22,6 @@ dist/
 *.swp
 *.swo
 .DS_Store
+
+todo.md
+backend/debug.log

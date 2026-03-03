@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { listSessions, getSession } from "../services/api";
 import MistakeCard from "../components/MistakeCard";
 import type { SessionOut, SessionDetailOut } from "../types";
-
+import { useLanguageContext } from "../contexts/LanguageContext";
 const rowStyle: React.CSSProperties = {
   background: "#fff",
   border: "1px solid #e2e8f0",
@@ -34,6 +34,7 @@ const statusBadge = (status: string): React.CSSProperties => ({
 });
 
 export default function History() {
+  const { currentLanguageProfile, isLoadingLanguage } = useLanguageContext();
   const [sessions, setSessions] = useState<SessionOut[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<number | null>(null);
@@ -41,11 +42,17 @@ export default function History() {
   const [detailLoading, setDetailLoading] = useState(false);
 
   useEffect(() => {
-    listSessions()
+    const profile = currentLanguageProfile;
+    if (!profile) {
+      if (!isLoadingLanguage) setLoading(false);
+      return;
+    }
+    setLoading(true);
+    listSessions(profile.id)
       .then((data) => setSessions(data.sessions))
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, []);
+  }, [currentLanguageProfile, isLoadingLanguage]);
 
   const handleExpand = async (id: number) => {
     if (expandedId === id) {
@@ -65,14 +72,22 @@ export default function History() {
     }
   };
 
-  if (loading) {
+  if (loading || isLoadingLanguage) {
     return <p style={{ color: "#94a3b8", textAlign: "center" }}>Loading...</p>;
   }
 
+  if (!currentLanguageProfile) {
+    return (
+      <p style={{ color: "#94a3b8", textAlign: "center" }}>
+        Please select or create a language profile to view history.
+      </p>
+    );
+  }
+  const profile = currentLanguageProfile;
   return (
     <div>
       <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 16 }}>
-        Session History
+        Session History ({currentLanguageProfile.display_name})
       </h1>
 
       {sessions.length === 0 ? (

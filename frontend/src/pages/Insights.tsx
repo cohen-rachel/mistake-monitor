@@ -13,7 +13,7 @@ import {
   LineChart,
   Line,
 } from "recharts";
-
+import { useLanguageContext } from "../contexts/LanguageContext";
 const cardStyle: React.CSSProperties = {
   background: "#fff",
   border: "1px solid #e2e8f0",
@@ -49,23 +49,44 @@ const spanFix: React.CSSProperties = {
 };
 
 export default function Insights() {
+  const { currentLanguageProfile, isLoadingLanguage } = useLanguageContext();
   const [data, setData] = useState<InsightsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [hoveredCode, setHoveredCode] = useState<string | null>(null);
   const [selectedMistakeId, setSelectedMistakeId] = useState<number | null>(null);
-  const [language, setLanguage] = useState("en");
+  // const [language, setLanguage] = useState("en");
 
+  // useEffect(() => {
+  //   getInsights(10, 30, language)
+  //     .then(setData)
+  //     .catch(console.error)
+  //     .finally(() => setLoading(false));
+  // }, [language]);
   useEffect(() => {
-    getInsights(10, 30, language)
+    if (!currentLanguageProfile) {
+      if (!isLoadingLanguage) setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    console.log("currentLanguageProfile", currentLanguageProfile);
+    getInsights(10, 30, currentLanguageProfile.id)
       .then(setData)
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [language]);
+  }, [currentLanguageProfile, isLoadingLanguage]);
 
   if (loading) {
     return <p style={{ color: "#94a3b8", textAlign: "center" }}>Loading...</p>;
   }
 
+  if (!currentLanguageProfile) {
+    return (
+      <p style={{ color: "#94a3b8", textAlign: "center" }}>
+        Please select or create a language profile to view insights.
+      </p>
+    );
+  }
   if (!data) {
     return (
       <p style={{ color: "#94a3b8", textAlign: "center" }}>
@@ -82,7 +103,7 @@ export default function Insights() {
       <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 16 }}>
         Insights
       </h1>
-      <div style={{ marginBottom: 12 }}>
+      {/* <div style={{ marginBottom: 12 }}>
         <label style={{ fontSize: 14, color: "#475569", marginRight: 8 }}>Language:</label>
         <select
           value={language}
@@ -97,7 +118,7 @@ export default function Insights() {
           <option value="it">Italian</option>
           <option value="pt">Portuguese</option>
         </select>
-      </div>
+      </div> */}
 
       {data.improvement_banners.length > 0 && (
         <div style={{ marginBottom: 18 }}>

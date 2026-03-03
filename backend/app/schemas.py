@@ -16,6 +16,28 @@ class MistakeTypeOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+# ---------- User Language Profile ----------
+class UserLanguageProfileBase(BaseModel):
+    language_code: str
+    display_name: str
+
+
+class UserLanguageProfileCreate(UserLanguageProfileBase):
+    pass
+
+
+class UserLanguageProfileOut(UserLanguageProfileBase):
+    id: int
+    user_id: int
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class UserLanguageProfileSetCurrent(BaseModel):
+    profile_id: int
+
+
 # ---------- Mistake ----------
 class MistakeOut(BaseModel):
     id: int
@@ -210,7 +232,7 @@ class RewriteExerciseResponse(BaseModel):
 
 class RewriteSubmitRequest(BaseModel):
     user_id: int = 1
-    language: str = "en"
+    language_code: str
     source_mistake_id: int
     original_sentence: str
     wrong_span: Optional[str] = None

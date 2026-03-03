@@ -26,9 +26,15 @@ class User(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     created_at = Column(DateTime, default=utcnow, nullable=False)
+    current_language_profile_id = Column(
+        Integer, ForeignKey("user_language_profiles.id"), nullable=True
+    )
 
     sessions = relationship("Session", back_populates="user", lazy="selectin")
-    language_profiles = relationship("UserLanguageProfile", back_populates="user", lazy="selectin")
+    language_profiles = relationship("UserLanguageProfile", back_populates="user", lazy="selectin", foreign_keys="UserLanguageProfile.user_id")
+    current_language_profile = relationship(
+        "UserLanguageProfile", foreign_keys=[current_language_profile_id], post_update=True
+    )
     practice_attempts = relationship("PracticeAttempt", back_populates="user", lazy="selectin")
     rewrite_attempts = relationship("RewriteAttempt", back_populates="user", lazy="selectin")
 
@@ -72,7 +78,7 @@ class UserLanguageProfile(Base):
     display_name = Column(String(100), nullable=False)
     created_at = Column(DateTime, default=utcnow, nullable=False)
 
-    user = relationship("User", back_populates="language_profiles")
+    user = relationship("User", back_populates="language_profiles", foreign_keys="UserLanguageProfile.user_id")
     session_links = relationship("SessionLanguageProfile", back_populates="language_profile", lazy="selectin")
 
     __table_args__ = (UniqueConstraint("user_id", "language_code"),)
@@ -162,6 +168,7 @@ class RewriteAttempt(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     language = Column(String(10), nullable=False, default="en", index=True)
+    language_code = Column(String(10), nullable=False, index=True)
     source_mistake_id = Column(Integer, ForeignKey("mistakes.id"), nullable=False, index=True)
     original_sentence = Column(Text, nullable=False)
     wrong_span = Column(String(500), nullable=True)

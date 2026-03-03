@@ -15,6 +15,7 @@ import type {
   TopicAttemptItem,
   PracticeSelection,
 } from "../types";
+import { useLanguageContext } from "../contexts/LanguageContext";
 
 const sectionStyle: React.CSSProperties = {
   background: "#fff",
@@ -67,8 +68,8 @@ function formatDuration(totalSeconds: number): string {
 }
 
 export default function Landing() {
+  const { currentLanguageProfile, isLoadingLanguage } = useLanguageContext();
   const [tab, setTab] = useState<"record" | "upload">("record");
-  const [language, setLanguage] = useState("en");
 
   // Topic practice state
   const [topics, setTopics] = useState<TopicItem[]>([]);
@@ -117,11 +118,13 @@ export default function Landing() {
   }, [estimatedLevel, selectedTopic, selectedTopicKey]);
 
   useEffect(() => {
+    if (!currentLanguageProfile) return;
+
     let cancelled = false;
     const loadTopics = async () => {
       setTopicsLoading(true);
       try {
-        const data = await getTopics(language);
+        const data = await getTopics(currentLanguageProfile.language_code);
         if (cancelled) return;
         setTopics(data.topics);
         setEstimatedLevel(data.estimated_level);
@@ -142,9 +145,11 @@ export default function Landing() {
     return () => {
       cancelled = true;
     };
-  }, [language, selectedTopicKey]);
+  }, [currentLanguageProfile, selectedTopicKey]);
 
   useEffect(() => {
+    if (!currentLanguageProfile) return;
+
     let cancelled = false;
     const loadHistory = async () => {
       if (!selectedTopicKey || selectedTopicKey === "free_talk") {
@@ -152,7 +157,10 @@ export default function Landing() {
         return;
       }
       try {
-        const data = await getTopicHistory(selectedTopicKey, language);
+        const data = await getTopicHistory(
+          selectedTopicKey,
+          currentLanguageProfile.language_code
+        );
         if (!cancelled) {
           setTopicHistory(data.attempts);
         }
@@ -164,7 +172,7 @@ export default function Landing() {
     return () => {
       cancelled = true;
     };
-  }, [language, selectedTopicKey]);
+  }, [currentLanguageProfile, selectedTopicKey]);
 
   useEffect(() => {
     if (!isRecording) return;
@@ -207,6 +215,10 @@ export default function Landing() {
   };
 
   const handleAnalyzeRecording = async () => {
+    if (!currentLanguageProfile) {
+      setStatusMsg("Select a language profile first.");
+      return;
+    }
     const fullText = liveTranscript.trim();
     if (!fullText) {
       setStatusMsg("No transcript to analyze. Record something first.");
@@ -218,7 +230,7 @@ export default function Landing() {
     try {
       const session = await createSessionWithTranscript(
         fullText,
-        language,
+        currentLanguageProfile.id,
         buildPracticeSelection()
       );
       setStatusMsg("Analyzing...");
@@ -230,7 +242,10 @@ export default function Landing() {
           : "No mistakes found!"
       );
       if (selectedTopicKey !== "free_talk") {
-        const updated = await getTopicHistory(selectedTopicKey, language);
+        const updated = await getTopicHistory(
+          selectedTopicKey,
+          currentLanguageProfile.language_code
+        );
         setTopicHistory(updated.attempts);
       }
     } catch (err: any) {
@@ -248,13 +263,17 @@ export default function Landing() {
   };
 
   const handleUploadAnalyze = async () => {
+    if (!currentLanguageProfile) {
+      setUploadStatus("Select a language profile first.");
+      return;
+    }
     if (!uploadFile) return;
     setUploadAnalyzing(true);
     setUploadStatus("Uploading and analyzing...");
     try {
       const session = await createSessionWithAudio(
         uploadFile,
-        language,
+        currentLanguageProfile.id,
         buildPracticeSelection()
       );
       setUploadTranscript(session.transcript?.raw_text || "");
@@ -281,105 +300,92 @@ export default function Landing() {
         track improvement over time.
       </p>
 
-      <div style={tabBarStyle}>
-        <button
-          style={{ ...tabStyle(tab === "record"), borderRadius: "8px 0 0 8px" }}
-          onClick={() => setTab("record")}
-        >
-          Real-time Speaking
-        </button>
-        <button
-          style={{ ...tabStyle(tab === "upload"), borderRadius: "0 8px 8px 0" }}
-          onClick={() => setTab("upload")}
-        >
-          Upload Audio File
-        </button>
-      </div>
+      {isLoadingLanguage ? (
+        <p>Loading language profiles...</p>
+      ) : currentLanguageProfile ? (
+        <div style={tabBarStyle}>
+          <button
+            style={{ ...tabStyle(tab === "record"), borderRadius: "8px 0 0 8px" }}
+            onClick={() => setTab("record")}
+          >
+            Real-time Speaking
+          </button>
+          <button
+            style={{ ...tabStyle(tab === "upload"), borderRadius: "0 8px 8px 0" }}
+            onClick={() => setTab("upload")}
+          >
+            Upload Audio File
+          </button>
+        </div>
+      ) : null}
 
-      <div style={{ ...sectionStyle, marginBottom: 16 }}>
-        <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center" }}>
-          <div>
-            <label style={{ fontSize: 14, color: "#475569", marginRight: 8 }}>
-              Spoken language:
-            </label>
+      {isLoadingLanguage ? null : currentLanguageProfile ? (
+        <div style={{ ...sectionStyle, marginBottom: 16 }}>
+          <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center" }}>
+            <div style={{ fontSize: 13, color: "#475569" }}>
+              Estimated level: <strong>{estimatedLevel}</strong>
+            </div>
+          </div>
+
+          <div style={{ marginTop: 12, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <label style={{ fontSize: 14, color: "#475569" }}>Practice topic:</label>
             <select
-              value={language}
-              onChange={(e) => setLanguage(e.target.value)}
+              value={selectedTopicKey}
+              onChange={(e) => setSelectedTopicKey(e.target.value)}
               style={{
+                minWidth: 260,
                 padding: "8px 10px",
                 borderRadius: 8,
                 border: "1px solid #cbd5e1",
                 background: "#fff",
                 color: "#1e293b",
               }}
+              disabled={topicsLoading || topics.length === 0}
             >
-              <option value="en">English</option>
-              <option value="es">Spanish</option>
-              <option value="fr">French</option>
-              <option value="de">German</option>
-              <option value="it">Italian</option>
-              <option value="pt">Portuguese</option>
-              <option value="ja">Japanese</option>
+              {topics.map((t) => (
+                <option key={t.key} value={t.key}>
+                  {t.title}
+                </option>
+              ))}
             </select>
+            <button
+              type="button"
+              onClick={handleRandomizeTopic}
+              style={{ ...btnPrimary, background: "#2563eb", padding: "8px 12px" }}
+              disabled={topics.length <= 1}
+            >
+              Randomize
+            </button>
           </div>
 
-          <div style={{ fontSize: 13, color: "#475569" }}>
-            Estimated level: <strong>{estimatedLevel}</strong>
-          </div>
-        </div>
+          {selectedTopic && (
+            <p style={{ marginTop: 10, color: "#334155", fontSize: 14 }}>
+              <strong>Prompt:</strong> {selectedTopic.prompt}
+            </p>
+          )}
 
-        <div style={{ marginTop: 12, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-          <label style={{ fontSize: 14, color: "#475569" }}>Practice topic:</label>
-          <select
-            value={selectedTopicKey}
-            onChange={(e) => setSelectedTopicKey(e.target.value)}
-            style={{
-              minWidth: 260,
-              padding: "8px 10px",
-              borderRadius: 8,
-              border: "1px solid #cbd5e1",
-              background: "#fff",
-              color: "#1e293b",
-            }}
-            disabled={topicsLoading || topics.length === 0}
-          >
-            {topics.map((t) => (
-              <option key={t.key} value={t.key}>
-                {t.title}
-              </option>
-            ))}
-          </select>
-          <button
-            type="button"
-            onClick={handleRandomizeTopic}
-            style={{ ...btnPrimary, background: "#2563eb", padding: "8px 12px" }}
-            disabled={topics.length <= 1}
-          >
-            Randomize
-          </button>
-        </div>
-
-        {selectedTopic && (
-          <p style={{ marginTop: 10, color: "#334155", fontSize: 14 }}>
-            <strong>Prompt:</strong> {selectedTopic.prompt}
-          </p>
-        )}
-
-        {selectedTopicKey !== "free_talk" && topicHistory.length > 0 && (
-          <div style={{ marginTop: 12, padding: 12, borderRadius: 8, background: "#f8fafc", border: "1px solid #e2e8f0" }}>
-            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6, color: "#334155" }}>
-              Previous attempts for this topic
-            </div>
-            {topicHistory.slice(0, 3).map((attempt) => (
-              <div key={attempt.id} style={{ fontSize: 13, color: "#475569", marginBottom: 4 }}>
-                {attempt.date} · Mistakes: {attempt.mistake_count}
+          {selectedTopicKey !== "free_talk" && topicHistory.length > 0 && (
+            <div style={{ marginTop: 12, padding: 12, borderRadius: 8, background: "#f8fafc", border: "1px solid #e2e8f0" }}>
+              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6, color: "#334155" }}>
+                Previous attempts for this topic
               </div>
-            ))}
-          </div>
-        )}
-      </div>
+              {topicHistory.slice(0, 3).map((attempt) => (
+                <div key={attempt.id} style={{ fontSize: 13, color: "#475569", marginBottom: 4 }}>
+                  {attempt.date} · Mistakes: {attempt.mistake_count}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : (
+        <div style={{ ...sectionStyle, marginBottom: 16 }}>
+          <p style={{ color: "#64748b", margin: 0 }}>
+            No language profile found yet. A default profile should appear after backend restart.
+          </p>
+        </div>
+      )}
 
-      {tab === "record" && (
+      {tab === "record" && currentLanguageProfile && (
         <div>
           <div style={sectionStyle}>
             <div
@@ -394,7 +400,7 @@ export default function Landing() {
               <AudioRecorder
                 onChunk={handleChunk}
                 onStatusChange={handleStatusChange}
-                language={language}
+                language={currentLanguageProfile.language_code}
               />
               <div style={{ fontSize: 14, color: "#475569" }}>
                 Timer: <strong>{formatDuration(elapsedSec)}</strong>
@@ -447,7 +453,7 @@ export default function Landing() {
         </div>
       )}
 
-      {tab === "upload" && (
+      {tab === "upload" && currentLanguageProfile && (
         <div>
           <div style={sectionStyle}>
             <div
