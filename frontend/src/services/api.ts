@@ -131,19 +131,22 @@ export async function getInsights(
 
 // ---------- Topic Practice ----------
 
-export async function getTopics(language: string, userId: number = 1): Promise<TopicListResponse> {
+export async function getTopics(
+  language_code: string,
+  userId: number = 1
+): Promise<TopicListResponse> {
   return request<TopicListResponse>(
-    `/topics?language=${encodeURIComponent(language)}&user_id=${userId}`
+    `/topics?language_code=${encodeURIComponent(language_code)}&user_id=${userId}`
   );
 }
 
 export async function getTopicHistory(
   topicKey: string,
-  language: string,
+  language_code: string,
   userId: number = 1
 ): Promise<TopicHistoryResponse> {
   return request<TopicHistoryResponse>(
-    `/topics/history?topic_key=${encodeURIComponent(topicKey)}&language=${encodeURIComponent(language)}&user_id=${userId}`
+    `/topics/history?topic_key=${encodeURIComponent(topicKey)}&language_code=${encodeURIComponent(language_code)}&user_id=${userId}`
   );
 }
 
