@@ -211,6 +211,7 @@ async def get_insights(
 
         rewrite_query = (
             select(RewriteAttempt)
+            .where(RewriteAttempt.language_code == language_code)
             .order_by(RewriteAttempt.created_at.desc())
             .limit(200)
         )
