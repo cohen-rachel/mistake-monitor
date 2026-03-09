@@ -92,6 +92,9 @@ def _evaluate_rewrite(
 async def next_exercise(
     language_code: str = Query(..., description="Language code to filter exercises"),
     user_id: int = Query(1, ge=1),
+    exclude_mistake_ids: list[int] | None = Query(
+        None, description="Optional mistake IDs to skip from selection"
+    ),
     db: AsyncSession = Depends(get_db),
 ):
     """Serve a recent mistake as a rewrite exercise."""
@@ -106,6 +109,13 @@ async def next_exercise(
         .subquery()
     )
 
+    where_clauses = [
+        Session.user_id == user_id,
+        UserLanguageProfile.language_code == language_code,
+    ]
+    if exclude_mistake_ids:
+        where_clauses.append(Mistake.id.not_in(exclude_mistake_ids))
+
     query = (
         select(Mistake, MistakeType, Session, Transcript, subq.c.cnt)
         .join(MistakeType, Mistake.mistake_type_id == MistakeType.id)
@@ -114,7 +124,7 @@ async def next_exercise(
         .join(SessionLanguageProfile, SessionLanguageProfile.session_id == Session.id)
         .join(UserLanguageProfile, UserLanguageProfile.id == SessionLanguageProfile.language_profile_id)
         .outerjoin(subq, subq.c.source_mistake_id == Mistake.id)
-        .where(Session.user_id == user_id, UserLanguageProfile.language_code == language_code)
+        .where(*where_clauses)
         .order_by(func.coalesce(subq.c.cnt, 0).asc(), Mistake.id.desc())
         .limit(1)
     )

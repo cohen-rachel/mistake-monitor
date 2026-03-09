@@ -154,11 +154,15 @@ export async function getTopicHistory(
 
 export async function getRewriteExercise(
   language_code: string,
-  userId: number = 1
+  userId: number = 1,
+  excludeMistakeIds?: number[]
 ): Promise<RewriteExerciseResponse> {
-  return request<RewriteExerciseResponse>(
-    `/rewrite/next?language_code=${encodeURIComponent(language_code)}&user_id=${userId}`
-  );
+  const params = new URLSearchParams({
+    language_code,
+    user_id: String(userId),
+  });
+  excludeMistakeIds?.forEach((id) => params.append("exclude_mistake_ids", String(id)));
+  return request<RewriteExerciseResponse>(`/rewrite/next?${params.toString()}`);
 }
 
 export async function submitRewriteExercise(

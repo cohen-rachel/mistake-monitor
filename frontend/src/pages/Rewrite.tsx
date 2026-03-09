@@ -34,19 +34,50 @@ export default function Rewrite() {
   const [stats, setStats] = useState<RewriteStatsResponse | null>(null);
   const [answer, setAnswer] = useState("");
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [skipMessage, setSkipMessage] = useState("");
+  const [noMistakesMessage, setNoMistakesMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [seenMistakeIds, setSeenMistakeIds] = useState<number[]>([]);
+  const [hasSubmitted, setHasSubmitted] = useState(false);
 
-  const loadExercise = async () => {
+  const loadExercise = async (options?: {
+    postMessage?: string;
+    excludeIds?: number[];
+  }) => {
     if (!currentLanguageProfile) return;
 
     setLoading(true);
     setFeedback(null);
+    setSkipMessage("");
+    setNoMistakesMessage(null);
     setAnswer("");
+    setHasSubmitted(false);
     try {
-      const ex = await getRewriteExercise(currentLanguageProfile.language_code);
+      const ex = await getRewriteExercise(
+        currentLanguageProfile.language_code,
+        1,
+        options?.excludeIds
+      );
       setExercise(ex);
-    } catch {
+      if (ex && !seenMistakeIds.includes(ex.source_mistake_id)) {
+        setSeenMistakeIds((prev) => [...prev, ex.source_mistake_id]);
+      }
+      if (options?.postMessage) {
+        setSkipMessage(options.postMessage);
+      }
+      if (!ex && options?.postMessage) {
+        setNoMistakesMessage("No mistakes to correct at this time!");
+      }
+    } catch (err: any) {
       setExercise(null);
+      const message =
+        err?.message && /no mistakes/i.test(err.message)
+          ? "No mistakes to correct at this time!"
+          : null;
+      setNoMistakesMessage(message);
+      if (message) {
+        setSeenMistakeIds([]);
+      }
     } finally {
       setLoading(false);
     }
@@ -91,6 +122,7 @@ export default function Rewrite() {
         `${base} Score ${Math.round(result.score * 100)}%. ${result.feedback}${expected}`
       );
       await loadStats();
+      setHasSubmitted(true);
     } catch (err: any) {
       setFeedback(err?.message || "Could not submit rewrite.");
     } finally {
@@ -146,24 +178,45 @@ export default function Rewrite() {
               }}
             />
             <div style={{ display: "flex", gap: 8 }}>
-              <button style={btnPrimary} onClick={handleSubmit} disabled={loading || !answer.trim()}>
-                Submit Rewrite
-              </button>
               <button
-                style={{ ...btnPrimary, background: "#0ea5e9" }}
-                onClick={loadExercise}
-                disabled={loading}
+                style={btnPrimary}
+                onClick={
+                  hasSubmitted
+                    ? () =>
+                        loadExercise({
+                          postMessage: "Next sentence loaded.",
+                          excludeIds: [...seenMistakeIds],
+                        })
+                    : handleSubmit
+                }
+                disabled={loading || (!hasSubmitted && !answer.trim())}
               >
-                Next Sentence
+                {hasSubmitted ? "Next Sentence" : "Submit Rewrite"}
               </button>
+              {!hasSubmitted && (
+                <button
+                  style={{ ...btnPrimary, background: "#0ea5e9" }}
+                  onClick={() =>
+                    loadExercise({
+                      postMessage: "Skipped to the next mistake.",
+                      excludeIds: [...seenMistakeIds],
+                    })
+                  }
+                  disabled={loading}
+                >
+                  Skip
+                </button>
+              )}
             </div>
-            {feedback && (
-              <p style={{ marginTop: 10, color: "#334155", fontSize: 14 }}>{feedback}</p>
+            {(feedback || skipMessage) && (
+              <p style={{ marginTop: 10, color: "#334155", fontSize: 14 }}>
+                {feedback || skipMessage}
+              </p>
             )}
           </>
         ) : (
           <p style={{ color: "#94a3b8" }}>
-            No rewrite exercises available yet. Analyze a few sessions first.
+            {noMistakesMessage ?? "No rewrite exercises available yet. Analyze a few sessions first."}
           </p>
         )}
       </div>
