@@ -2,7 +2,10 @@
 
 import json
 import logging
+import re
 from typing import Optional
+
+from langdetect import DetectorFactory, LangDetectException, detect_langs
 
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -27,7 +30,7 @@ COMMON_PROMPT_SUFFIX = (
     "pronunciation, false-friend, pronoun, pluralization, vocabulary, "
     "subject-verb-agreement, other. If a token's STT confidence < 0.6, set "
     "\"stt_uncertain\": true. If you are uncertain whether something is an error, "
-    "set \"uncertain\": true and provide a short reason. Output only valid JSON "
+    "set \"uncertain\": true and provide a short reason. If the language of the transcript does not match the language you are aiming to correct, output the message 'Language mismatch: transcript is in {transcript_language} but you are aiming to correct {language}'. Output only valid JSON "
     "matching this schema: "
     '{"mistakes": [{"type": "str", "span_text": "str", "start_char": 0, '
     '"end_char": 0, "suggested_correction": "str", "explanation": "str", '
@@ -68,6 +71,28 @@ DEFAULT_SYSTEM_PROMPT = (
 )
 
 
+# Stabilize langdetect randomness so repeated runs behave same.
+DetectorFactory.seed = 0
+
+__LANGUAGE_CONFIDENCE_THRESHOLD = 0.6
+
+
+LANGUAGE_MISMATCH_PATTERN = re.compile(
+    r"Language mismatch:\s*transcript is in (?P<transcript>.+?) but you are aiming to correct (?P<target>.+)",
+    re.IGNORECASE,
+)
+
+
+class LanguageMismatchError(ValueError):
+    def __init__(self, transcript_language: str, target_language: str, raw_response: str):
+        self.transcript_language = transcript_language
+        self.target_language = target_language
+        self.raw_response = raw_response
+        super().__init__(
+            f"Language mismatch: transcript is in {transcript_language} but you are aiming to correct {target_language}"
+        )
+
+
 def _build_user_prompt(
     transcript: str,
     language: str,
@@ -84,6 +109,49 @@ def _build_user_prompt(
         )
         parts.append(f"\nPrior mistake summary (top types with counts): {summary_text}")
     return "\n".join(parts)
+
+
+def _strip_code_fences(text: str) -> str:
+    content = text.strip()
+    if content.startswith("```"):
+        lines = content.split("\n")
+        lines = [line for line in lines if not line.strip().startswith("```")]
+        content = "\n".join(lines)
+    return content
+
+
+def _maybe_language_mismatch(text: str) -> Optional[LanguageMismatchError]:
+    match = LANGUAGE_MISMATCH_PATTERN.search(text)
+    if not match:
+        return None
+    transcript_language = match.group("transcript").strip()
+    target_language = match.group("target").strip()
+    return LanguageMismatchError(transcript_language, target_language, text)
+
+
+def _detect_transcript_language(text: str) -> Optional[tuple[str, float]]:
+    content = text.strip()
+    if not content:
+        return None
+
+    try:
+        detections = detect_langs(content)
+    except LangDetectException as exc:
+        logger.warning("Unable to detect transcript language: %s", exc)
+        return None
+
+    if not detections:
+        return None
+
+    best = detections[0]
+    if best.prob < __LANGUAGE_CONFIDENCE_THRESHOLD:
+        logger.debug(
+            "Low-confidence language detection (%.2f) for transcript; treating as unknown.",
+            best.prob,
+        )
+        return None
+
+    return best.lang, best.prob
 
 
 async def get_prior_mistake_summary(
@@ -107,13 +175,10 @@ async def get_prior_mistake_summary(
 
 def _parse_llm_response(raw: str) -> list[LLMMistake]:
     """Parse the LLM JSON response into validated Pydantic models."""
-    # Try to extract JSON from the response (handle markdown fences etc.)
-    text = raw.strip()
-    if text.startswith("```"):
-        # Strip markdown code fences
-        lines = text.split("\n")
-        lines = [l for l in lines if not l.strip().startswith("```")]
-        text = "\n".join(lines)
+    text = _strip_code_fences(raw)
+    mismatch = _maybe_language_mismatch(text)
+    if mismatch:
+        raise mismatch
 
     try:
         data = json.loads(text)
@@ -179,6 +244,21 @@ async def analyze_transcript(
             raise ValueError(f"No transcript found for session {session_id}")
         transcript_text = transcript_obj.raw_text
 
+    detected_language_info = _detect_transcript_language(transcript_text)
+    if detected_language_info:
+        detected_language, confidence = detected_language_info
+        if detected_language != session.language:
+            logger.warning(
+                "Detected transcript language %s (confidence %.2f) != session target %s; short-circuiting analysis.",
+                detected_language,
+                confidence,
+                session.language,
+            )
+            session.status = "error"
+            await db.commit()
+            mismatch_error = LanguageMismatchError(detected_language, session.language, f"detected confidence {confidence:.2f}")
+            raise ValueError(str(mismatch_error))
+
     # Get prior mistake summary for personalization in the same language.
     prior_summary = await get_prior_mistake_summary(
         db,
@@ -190,46 +270,62 @@ async def analyze_transcript(
     user_prompt = _build_user_prompt(transcript_text, session.language, prior_summary)
     system_prompt = SYSTEM_PROMPT_BY_LANGUAGE.get(session.language, DEFAULT_SYSTEM_PROMPT)
     llm = get_llm_provider()
-    logger.info(f"LLM System Prompt (Language: {session.language}): \"\"\"{system_prompt}\"\"\"") # ADD THIS LINE
-    logger.info(f"LLM User Prompt: \"\"\"{user_prompt}\"\"\"") # ADD THIS LINE
+    logger.info(f"LLM System Prompt (Language: {session.language}): \"\"\"{system_prompt}\"\"\"")
+    logger.info(f"LLM User Prompt: \"\"\"{user_prompt}\"\"\"")
+
+    raw_response = ""
+    llm_mistakes: list[LLMMistake] = []
+    language_mismatch_error: Optional[LanguageMismatchError] = None
+    analysis_failed = False
 
     try:
         raw_response = await llm.complete(system_prompt, user_prompt)
-        logger.info(f"LLM Raw Response: {raw_response[:500]}...") # ADD THIS LINE (truncated to 500 chars)
+        logger.info(f"LLM Raw Response: {raw_response[:500]}...")
         llm_mistakes = _parse_llm_response(raw_response)
-    except Exception as e:
-        logger.error(f"LLM analysis failed: {e}")
-        session.status = "error" 
-        llm_mistakes = []
-
-    # Store mistakes
-    db_mistakes = []
-    for m in llm_mistakes:
-        type_id = await _resolve_mistake_type(db, m.type)
-        mistake = Mistake(
-            session_id=session_id,
-            mistake_type_id=type_id,
-            transcript_span=m.span_text,
-            start_char=m.start_char,
-            end_char=m.end_char,
-            suggested_correction=m.suggested_correction,
-            explanation_short=m.explanation,
-            confidence=m.confidence,
-            stt_uncertain=m.stt_uncertain,
-            uncertain=m.uncertain,
-            uncertain_reason=m.uncertain_reason,
+    except LanguageMismatchError as mismatch_error:
+        analysis_failed = True
+        language_mismatch_error = mismatch_error
+        logger.warning(
+            "LLM reported language mismatch (transcript=%s target=%s); raw response snippet: %s",
+            mismatch_error.transcript_language,
+            mismatch_error.target_language,
+            raw_response[:500],
         )
-        db.add(mistake)
-        db_mistakes.append(mistake)
+    except Exception:
+        analysis_failed = True
+        logger.exception("LLM analysis failed during completion/parsing; inspect prompts and response above.")
+        logger.debug("LLM Raw Response (truncated): %s", raw_response[:500])
 
-    # Update session status
+    db_mistakes: list[Mistake] = []
+    if not analysis_failed:
+        for m in llm_mistakes:
+            type_id = await _resolve_mistake_type(db, m.type)
+            mistake = Mistake(
+                session_id=session_id,
+                mistake_type_id=type_id,
+                transcript_span=m.span_text,
+                start_char=m.start_char,
+                end_char=m.end_char,
+                suggested_correction=m.suggested_correction,
+                explanation_short=m.explanation,
+                confidence=m.confidence,
+                stt_uncertain=m.stt_uncertain,
+                uncertain=m.uncertain,
+                uncertain_reason=m.uncertain_reason,
+            )
+            db.add(mistake)
+            db_mistakes.append(mistake)
+
     if session:
-        session.status = "analyzed"
+        session.status = "error" if analysis_failed else "analyzed"
 
     await db.commit()
 
     # Refresh to get IDs and relationships
     for m in db_mistakes:
         await db.refresh(m)
+
+    if language_mismatch_error:
+        raise ValueError(str(language_mismatch_error))
 
     return db_mistakes
