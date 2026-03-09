@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect, useMemo } from "react";
+import { useCallback, useRef, useEffect, useMemo } from "react";
 import AudioRecorder from "../components/AudioRecorder";
 import TranscriptDisplay from "../components/TranscriptDisplay";
 import MistakeCard from "../components/MistakeCard";
@@ -16,6 +16,7 @@ import type {
   PracticeSelection,
 } from "../types";
 import { useLanguageContext } from "../contexts/LanguageContext";
+import { useLandingState } from "../contexts/LandingStateContext";
 
 const sectionStyle: React.CSSProperties = {
   background: "#fff",
@@ -69,29 +70,42 @@ function formatDuration(totalSeconds: number): string {
 
 export default function Landing() {
   const { currentLanguageProfile, isLoadingLanguage } = useLanguageContext();
-  const [tab, setTab] = useState<"record" | "upload">("record");
-
-  // Topic practice state
-  const [topics, setTopics] = useState<TopicItem[]>([]);
-  const [estimatedLevel, setEstimatedLevel] = useState("beginner");
-  const [selectedTopicKey, setSelectedTopicKey] = useState("free_talk");
-  const [topicHistory, setTopicHistory] = useState<TopicAttemptItem[]>([]);
-  const [topicsLoading, setTopicsLoading] = useState(false);
-
-  // Record state
-  const [isRecording, setIsRecording] = useState(false);
-  const [elapsedSec, setElapsedSec] = useState(0);
-  const [liveTranscript, setLiveTranscript] = useState("");
-  const [analyzing, setAnalyzing] = useState(false);
-  const [mistakes, setMistakes] = useState<MistakeOut[]>([]);
-  const [statusMsg, setStatusMsg] = useState("");
-
-  // Upload state
-  const [uploadFile, setUploadFile] = useState<File | null>(null);
-  const [uploadAnalyzing, setUploadAnalyzing] = useState(false);
-  const [uploadMistakes, setUploadMistakes] = useState<MistakeOut[]>([]);
-  const [uploadTranscript, setUploadTranscript] = useState("");
-  const [uploadStatus, setUploadStatus] = useState("");
+  const {
+    tab,
+    setTab,
+    topics,
+    setTopics,
+    estimatedLevel,
+    setEstimatedLevel,
+    selectedTopicKey,
+    setSelectedTopicKey,
+    topicHistory,
+    setTopicHistory,
+    topicsLoading,
+    setTopicsLoading,
+    isRecording,
+    setIsRecording,
+    elapsedSec,
+    setElapsedSec,
+    liveTranscript,
+    setLiveTranscript,
+    analyzing,
+    setAnalyzing,
+    mistakes,
+    setMistakes,
+    statusMsg,
+    setStatusMsg,
+    uploadFile,
+    setUploadFile,
+    uploadAnalyzing,
+    setUploadAnalyzing,
+    uploadMistakes,
+    setUploadMistakes,
+    uploadTranscript,
+    setUploadTranscript,
+    uploadStatus,
+    setUploadStatus,
+  } = useLandingState();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 

@@ -4,6 +4,7 @@ import Landing from "./pages/Landing";
 import History from "./pages/History";
 import Insights from "./pages/Insights";
 import Rewrite from "./pages/Rewrite";
+import { LandingStateProvider } from "./contexts/LandingStateContext";
 
 const globalStyles = `
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -23,12 +24,14 @@ export default function App() {
       <style>{globalStyles}</style>
       <Navbar />
       <main style={{ maxWidth: 960, margin: "0 auto", padding: "24px 16px" }}>
-        <Routes>
-          <Route path="/" element={<Landing />} />
-          <Route path="/history" element={<History />} />
-          <Route path="/insights" element={<Insights />} />
-          <Route path="/rewrite" element={<Rewrite />} />
-        </Routes>
+        <LandingStateProvider>
+          <Routes>
+            <Route path="/" element={<Landing />} />
+            <Route path="/history" element={<History />} />
+            <Route path="/insights" element={<Insights />} />
+            <Route path="/rewrite" element={<Rewrite />} />
+          </Routes>
+        </LandingStateProvider>
       </main>
     </>
   );
