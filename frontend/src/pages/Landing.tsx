@@ -431,7 +431,11 @@ export default function Landing() {
               <p style={{ marginBottom: 8, fontSize: 13, color: "#475569" }}>{durationHint}</p>
             )}
 
-            <TranscriptDisplay transcript={liveTranscript} isRecording={isRecording} />
+            <TranscriptDisplay
+              transcript={liveTranscript}
+              isRecording={isRecording}
+              onTranscriptChange={(value) => setLiveTranscript(value)}
+            />
 
             {statusMsg && (
               <p style={{ marginTop: 12, fontSize: 14, color: "#475569" }}>

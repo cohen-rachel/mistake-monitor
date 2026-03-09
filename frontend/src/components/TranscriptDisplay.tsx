@@ -1,6 +1,7 @@
 interface Props {
   transcript: string;
   isRecording: boolean;
+  onTranscriptChange?: (updated: string) => void;
 }
 
 const containerStyle: React.CSSProperties = {
@@ -10,38 +11,52 @@ const containerStyle: React.CSSProperties = {
   padding: 16,
   minHeight: 120,
   maxHeight: 300,
-  overflowY: "auto",
   fontFamily: "'SF Mono', 'Fira Code', monospace",
   fontSize: 14,
   lineHeight: 1.8,
   color: "#334155",
+  position: "relative",
 };
 
-export default function TranscriptDisplay({ transcript, isRecording }: Props) {
-  if (!transcript && !isRecording) {
-    return (
-      <div style={{ ...containerStyle, color: "#94a3b8" }}>
-        Transcript will appear here...
-      </div>
-    );
-  }
+const textareaStyle: React.CSSProperties = {
+  width: "100%",
+  height: "100%",
+  minHeight: 120,
+  maxHeight: 300,
+  background: "transparent",
+  border: "none",
+  resize: "vertical",
+  padding: 0,
+  font: "inherit",
+  outline: "none",
+  color: "inherit",
+};
 
+const indicatorStyle: React.CSSProperties = {
+  position: "absolute",
+  top: 16,
+  right: 16,
+  width: 8,
+  height: 16,
+  background: "#4338ca",
+  animation: "blink 1s infinite",
+};
+
+export default function TranscriptDisplay({
+  transcript,
+  isRecording,
+  onTranscriptChange,
+}: Props) {
   return (
     <div style={containerStyle}>
-      <span>{transcript} </span>
-      {isRecording && (
-        <span
-          style={{
-            display: "inline-block",
-            width: 8,
-            height: 16,
-            background: "#4338ca",
-            animation: "blink 1s infinite",
-            verticalAlign: "text-bottom",
-            marginLeft: 2,
-          }}
-        />
-      )}
+      <textarea
+        value={transcript}
+        onChange={(event) => onTranscriptChange?.(event.target.value)}
+        placeholder="Transcript will appear here..."
+        disabled={isRecording}
+        style={textareaStyle}
+      />
+      {isRecording && <span style={indicatorStyle} />}
       <style>{`@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }`}</style>
     </div>
   );
