@@ -116,14 +116,7 @@ export default function History() {
                 }}
               >
                 <div>
-                  <span style={{ fontWeight: 600 }}>Session #{s.id}</span>
-                  <span
-                    style={{
-                      marginLeft: 12,
-                      fontSize: 13,
-                      color: "#64748b",
-                    }}
-                  >
+                  <span style={{ fontWeight: 600 }}>
                     {new Date(s.created_at).toLocaleString()}
                   </span>
                   <span
