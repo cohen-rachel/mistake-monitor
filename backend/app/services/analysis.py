@@ -39,6 +39,14 @@ COMMON_PROMPT_SUFFIX = (
 )
 
 SYSTEM_PROMPT_BY_LANGUAGE = {
+    "en": (
+        "You are a English grammar and pedagogy assistant focused on learner English. "
+        "Prioritize: verb conjugation and tense/aspect (present, past, future), "
+        "subject-verb-agreement, article usage (a/an/the), preposition usage (in/on/at/to/from), "
+        "clitic pronouns (I/me/my/mine, you/your/yours, he/him/his, she/her/hers, it/its/its, we/us/our/ours, they/them/their/theirs), "
+        "negation (not/no/never), adjective placement, and false-friend vocabulary. Do not over-correct colloquial but acceptable spoken English. This is conversational English, not formal writing."
+        + COMMON_PROMPT_SUFFIX
+    ),
     "fr": (
         "You are a French grammar and pedagogy assistant focused on learner French. "
         "Prioritize: agreement (gender/number), article usage (le/la/les/un/une/des), "
@@ -276,6 +284,7 @@ async def analyze_transcript(
     raw_response = ""
     llm_mistakes: list[LLMMistake] = []
     language_mismatch_error: Optional[LanguageMismatchError] = None
+    analysis_exception: Optional[Exception] = None
     analysis_failed = False
 
     try:
@@ -291,8 +300,9 @@ async def analyze_transcript(
             mismatch_error.target_language,
             raw_response[:500],
         )
-    except Exception:
+    except Exception as exc:
         analysis_failed = True
+        analysis_exception = exc
         logger.exception("LLM analysis failed during completion/parsing; inspect prompts and response above.")
         logger.debug("LLM Raw Response (truncated): %s", raw_response[:500])
 
@@ -327,5 +337,8 @@ async def analyze_transcript(
 
     if language_mismatch_error:
         raise ValueError(str(language_mismatch_error))
+
+    if analysis_exception:
+        raise analysis_exception
 
     return db_mistakes
