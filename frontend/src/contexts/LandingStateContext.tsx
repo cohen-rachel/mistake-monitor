@@ -22,6 +22,8 @@ interface LandingStateContextType {
   setElapsedSec: React.Dispatch<React.SetStateAction<number>>;
   liveTranscript: string;
   setLiveTranscript: React.Dispatch<React.SetStateAction<string>>;
+  transcriptAnalyzed: boolean;
+  setTranscriptAnalyzed: React.Dispatch<React.SetStateAction<boolean>>;
   analyzing: boolean;
   setAnalyzing: React.Dispatch<React.SetStateAction<boolean>>;
   mistakes: MistakeOut[];
@@ -54,6 +56,7 @@ export const LandingStateProvider = ({ children }: { children: ReactNode }) => {
   const [isRecording, setIsRecording] = useState(false);
   const [elapsedSec, setElapsedSec] = useState(0);
   const [liveTranscript, setLiveTranscript] = useState("");
+  const [transcriptAnalyzed, setTranscriptAnalyzed] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [mistakes, setMistakes] = useState<MistakeOut[]>([]);
   const [statusMsg, setStatusMsg] = useState("");
@@ -84,6 +87,8 @@ export const LandingStateProvider = ({ children }: { children: ReactNode }) => {
         setElapsedSec,
         liveTranscript,
         setLiveTranscript,
+        transcriptAnalyzed,
+        setTranscriptAnalyzed,
         analyzing,
         setAnalyzing,
         mistakes,

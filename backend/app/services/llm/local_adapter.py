@@ -16,6 +16,7 @@ class OllamaProvider(LLMProvider):
     def __init__(self):
         self.base_url = settings.ollama_base_url
         self.model = settings.ollama_model
+        self.timeout_seconds = settings.ollama_timeout_seconds
 
     async def complete(self, system_prompt: str, user_prompt: str) -> str:
         url = f"{self.base_url}/api/chat"
@@ -31,7 +32,7 @@ class OllamaProvider(LLMProvider):
         logger.info("LLM Payload: %s", payload)
         logger.debug(f"Sending LLM request to {url}")
 
-        async with httpx.AsyncClient(timeout=120.0) as client:
+        async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
             try:
                 resp = await client.post(url, json=payload)
                 resp_text = resp.text
@@ -50,8 +51,9 @@ class OllamaProvider(LLMProvider):
                 raise
             except httpx.HTTPError as exc:
                 logger.exception(
-                    "LLM request failed (%s); payload keys=%s",
+                    "LLM request failed (%s); timeout=%ss; payload keys=%s",
                     type(exc).__name__,
+                    self.timeout_seconds,
                     list(payload.keys()),
                 )
                 raise

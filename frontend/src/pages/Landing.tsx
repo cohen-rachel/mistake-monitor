@@ -1,4 +1,4 @@
-import { useCallback, useRef, useEffect, useMemo } from "react";
+import { useCallback, useRef, useEffect, useMemo, useState } from "react";
 import AudioRecorder from "../components/AudioRecorder";
 import TranscriptDisplay from "../components/TranscriptDisplay";
 import MistakeCard from "../components/MistakeCard";
@@ -60,12 +60,26 @@ const btnDisabled: React.CSSProperties = {
   cursor: "not-allowed",
 };
 
+// Keep the batching scaffolding in place, but disable timed auto-analysis for now.
+const ENABLE_AUTO_ANALYZE_BATCHING = false;
+const AUTO_ANALYZE_INTERVAL_SEC = 20;
+
 function formatDuration(totalSeconds: number): string {
   const m = Math.floor(totalSeconds / 60)
     .toString()
     .padStart(2, "0");
   const s = (totalSeconds % 60).toString().padStart(2, "0");
   return `${m}:${s}`;
+}
+
+type QueuedAutoBatch = {
+  batchIndex: number;
+  transcript: string;
+};
+
+function isNonRetryableAutoAnalyzeError(error: unknown): boolean {
+  const status = (error as { status?: number } | null)?.status;
+  return typeof status === "number" && status >= 400 && status < 500;
 }
 
 export default function Landing() {
@@ -89,6 +103,8 @@ export default function Landing() {
     setElapsedSec,
     liveTranscript,
     setLiveTranscript,
+    transcriptAnalyzed,
+    setTranscriptAnalyzed,
     analyzing,
     setAnalyzing,
     mistakes,
@@ -106,13 +122,26 @@ export default function Landing() {
     uploadStatus,
     setUploadStatus,
   } = useLandingState();
+  const [autoAnalyzing, setAutoAnalyzing] = useState(false);
+  const [autoQueueVersion, setAutoQueueVersion] = useState(0);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const liveTranscriptRef = useRef(liveTranscript);
+  const recordingBaseTranscriptRef = useRef("");
+  const recordingSessionFullTranscriptRef = useRef("");
+  const pendingAutoTranscriptRef = useRef("");
+  const lastAutoBatchIndexRef = useRef(0);
+  const autoBatchQueueRef = useRef<QueuedAutoBatch[]>([]);
+  const autoQueueRunningRef = useRef(false);
 
   const selectedTopic = useMemo(
     () => topics.find((t) => t.key === selectedTopicKey) ?? null,
     [topics, selectedTopicKey]
   );
+
+  useEffect(() => {
+    liveTranscriptRef.current = liveTranscript;
+  }, [liveTranscript]);
 
   const buildPracticeSelection = useCallback((): PracticeSelection => {
     if (selectedTopicKey === "free_talk" || !selectedTopic) {
@@ -130,6 +159,62 @@ export default function Landing() {
       estimated_level: estimatedLevel,
     };
   }, [estimatedLevel, selectedTopic, selectedTopicKey]);
+
+  const analyzeTranscript = useCallback(
+    async (transcript: string, options?: { auto?: boolean }) => {
+      if (!currentLanguageProfile) return null;
+      const trimmed = transcript.trim();
+      if (!trimmed) return null;
+      const isAuto = !!options?.auto;
+      if (isAuto && (autoAnalyzing || analyzing)) {
+        return null;
+      }
+      const setLoading = isAuto ? setAutoAnalyzing : setAnalyzing;
+      setLoading(true);
+      try {
+        setStatusMsg(isAuto ? "Auto analyzing partial transcript..." : "Saving session...");
+        const session = await createSessionWithTranscript(
+          trimmed,
+          currentLanguageProfile.id,
+          buildPracticeSelection()
+        );
+        if (!isAuto) {
+          setStatusMsg("Analyzing...");
+        }
+        const result = await analyzeSession(session.id);
+        setMistakes((prev) => (isAuto ? [...prev, ...result.mistakes] : result.mistakes));
+        setStatusMsg(
+          result.mistakes.length > 0
+            ? `Found ${result.mistakes.length} mistake(s).`
+            : "No mistakes found!"
+        );
+        if (selectedTopicKey !== "free_talk") {
+          const updated = await getTopicHistory(
+            selectedTopicKey,
+            currentLanguageProfile.language_code
+          );
+          setTopicHistory(updated.attempts);
+        }
+        if (!isAuto) {
+          setTranscriptAnalyzed(true);
+        }
+        return result;
+      } catch (err: any) {
+        setStatusMsg(`Error: ${err?.message || "analysis failed"}`);
+        throw err;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [
+      currentLanguageProfile,
+      autoAnalyzing,
+      analyzing,
+      buildPracticeSelection,
+      selectedTopicKey,
+      setTopicHistory,
+    ]
+  );
 
   useEffect(() => {
     if (!currentLanguageProfile) return;
@@ -203,23 +288,133 @@ export default function Landing() {
     return "You can stop anytime. You already exceeded the target range.";
   }, [elapsedSec, isRecording]);
 
-  const handleChunk = useCallback((text: string, fullText?: string) => {
-    if (fullText) {
-      setLiveTranscript(fullText);
-      return;
-    }
-    setLiveTranscript((prev) => `${prev} ${text}`.trim());
-  }, []);
+  const handleChunk = useCallback(
+    (text: string, fullText?: string) => {
+      const nextSessionTranscript = fullText?.trim()
+        ? fullText.trim()
+        : `${recordingSessionFullTranscriptRef.current} ${text}`.trim();
+      recordingSessionFullTranscriptRef.current = nextSessionTranscript;
+      const deltaText = text.trim();
+      if (deltaText) {
+        pendingAutoTranscriptRef.current = [
+          pendingAutoTranscriptRef.current,
+          deltaText,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .trim();
+      }
+      const nextTranscript = [recordingBaseTranscriptRef.current, nextSessionTranscript]
+        .filter(Boolean)
+        .join(" ")
+        .trim();
+      setLiveTranscript(nextTranscript);
+      setTranscriptAnalyzed(false);
+    },
+    [setTranscriptAnalyzed]
+  );
 
   const handleStatusChange = useCallback((recording: boolean) => {
     setIsRecording(recording);
     if (recording) {
+      recordingSessionFullTranscriptRef.current = "";
+      lastAutoBatchIndexRef.current = 0;
+      pendingAutoTranscriptRef.current = "";
+      autoBatchQueueRef.current = [];
+      autoQueueRunningRef.current = false;
+      setAutoQueueVersion((prev) => prev + 1);
       setElapsedSec(0);
       setStatusMsg("");
-      setMistakes([]);
-      setLiveTranscript("");
+      if (transcriptAnalyzed) {
+        recordingBaseTranscriptRef.current = "";
+        setMistakes([]);
+        setLiveTranscript("");
+        setTranscriptAnalyzed(false);
+      } else {
+        recordingBaseTranscriptRef.current = liveTranscriptRef.current.trim();
+        pendingAutoTranscriptRef.current = liveTranscriptRef.current.trim();
+      }
     }
-  }, []);
+  }, [setElapsedSec, setIsRecording, setLiveTranscript, setMistakes, setStatusMsg, setTranscriptAnalyzed, transcriptAnalyzed]);
+
+  useEffect(() => {
+    if (!ENABLE_AUTO_ANALYZE_BATCHING) return;
+    if (!isRecording) return;
+    const completedBatches = Math.floor(elapsedSec / AUTO_ANALYZE_INTERVAL_SEC);
+    if (completedBatches <= lastAutoBatchIndexRef.current) return;
+
+    for (
+      let batchIndex = lastAutoBatchIndexRef.current + 1;
+      batchIndex <= completedBatches;
+      batchIndex += 1
+    ) {
+      const transcript = pendingAutoTranscriptRef.current.trim();
+      lastAutoBatchIndexRef.current = batchIndex;
+      if (!transcript) {
+        continue;
+      }
+      pendingAutoTranscriptRef.current = "";
+      autoBatchQueueRef.current.push({
+        batchIndex,
+        transcript,
+      });
+    }
+    setAutoQueueVersion((prev) => prev + 1);
+  }, [
+    elapsedSec,
+    isRecording,
+  ]);
+
+  useEffect(() => {
+    if (!ENABLE_AUTO_ANALYZE_BATCHING) return;
+    if (autoQueueRunningRef.current || analyzing) return;
+    const nextBatch = autoBatchQueueRef.current[0];
+    if (!nextBatch) return;
+
+    let cancelled = false;
+    autoQueueRunningRef.current = true;
+
+    void (async () => {
+      try {
+        const result = await analyzeTranscript(nextBatch.transcript, { auto: true });
+        if (!cancelled && result) {
+          autoBatchQueueRef.current.shift();
+          setTranscriptAnalyzed(false);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          if (!isNonRetryableAutoAnalyzeError(error)) {
+            pendingAutoTranscriptRef.current = [
+              nextBatch.transcript,
+              pendingAutoTranscriptRef.current,
+            ]
+              .filter(Boolean)
+              .join(" ")
+              .trim();
+            autoBatchQueueRef.current = [];
+            lastAutoBatchIndexRef.current = Math.max(nextBatch.batchIndex - 1, 0);
+          } else {
+            setStatusMsg("Skipped one background batch because the transcript was not analyzable.");
+          }
+          autoBatchQueueRef.current.shift();
+        }
+      } finally {
+        autoQueueRunningRef.current = false;
+        if (!cancelled) {
+          setAutoQueueVersion((prev) => prev + 1);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    analyzeTranscript,
+    analyzing,
+    autoQueueVersion,
+    setTranscriptAnalyzed,
+  ]);
 
   const handleRandomizeTopic = () => {
     const selectable = topics.filter((t) => t.key !== "free_talk");
@@ -228,9 +423,13 @@ export default function Landing() {
     setSelectedTopicKey(next.key);
   };
 
-  const handleAnalyzeRecording = async () => {
+  const handleAnalyzeRecording = useCallback(async () => {
     if (!currentLanguageProfile) {
       setStatusMsg("Select a language profile first.");
+      return;
+    }
+    if (autoAnalyzing) {
+      setStatusMsg("Waiting for background analysis to finish...");
       return;
     }
     const fullText = liveTranscript.trim();
@@ -239,41 +438,32 @@ export default function Landing() {
       return;
     }
 
-    setAnalyzing(true);
-    setStatusMsg("Saving session...");
     try {
-      const session = await createSessionWithTranscript(
-        fullText,
-        currentLanguageProfile.id,
-        buildPracticeSelection()
-      );
-      setStatusMsg("Analyzing...");
-      const result = await analyzeSession(session.id);
-      setMistakes(result.mistakes);
-      setStatusMsg(
-        result.mistakes.length > 0
-          ? `Found ${result.mistakes.length} mistake(s).`
-          : "No mistakes found!"
-      );
-      if (selectedTopicKey !== "free_talk") {
-        const updated = await getTopicHistory(
-          selectedTopicKey,
-          currentLanguageProfile.language_code
-        );
-        setTopicHistory(updated.attempts);
-      }
-    } catch (err: any) {
-      setStatusMsg(`Error: ${err.message}`);
-    } finally {
-      setAnalyzing(false);
+      await analyzeTranscript(fullText);
+    } catch {
+      // Status text is already set inside analyzeTranscript.
     }
-  };
+  }, [
+    analyzeTranscript,
+    autoAnalyzing,
+    currentLanguageProfile,
+    liveTranscript,
+  ]);
 
   const handleReset = () => {
+    recordingBaseTranscriptRef.current = "";
+    recordingSessionFullTranscriptRef.current = "";
+    pendingAutoTranscriptRef.current = "";
+    lastAutoBatchIndexRef.current = 0;
+    autoBatchQueueRef.current = [];
+    autoQueueRunningRef.current = false;
+    setAutoQueueVersion((prev) => prev + 1);
     setLiveTranscript("");
+    setTranscriptAnalyzed(false);
     setMistakes([]);
     setStatusMsg("");
     setElapsedSec(0);
+    setAutoAnalyzing(false);
   };
 
   const handleUploadAnalyze = async () => {
@@ -422,10 +612,10 @@ export default function Landing() {
               {!isRecording && liveTranscript.length > 0 && (
                 <button
                   onClick={handleAnalyzeRecording}
-                  disabled={analyzing}
-                  style={analyzing ? btnDisabled : btnPrimary}
+                  disabled={analyzing || autoAnalyzing}
+                  style={analyzing || autoAnalyzing ? btnDisabled : btnPrimary}
                 >
-                  {analyzing ? "Analyzing..." : "Analyze"}
+                  {analyzing || autoAnalyzing ? "Analyzing..." : "Analyze"}
                 </button>
               )}
               {!isRecording && liveTranscript.length > 0 && (
@@ -448,7 +638,17 @@ export default function Landing() {
             <TranscriptDisplay
               transcript={liveTranscript}
               isRecording={isRecording}
-              onTranscriptChange={(value) => setLiveTranscript(value)}
+              onTranscriptChange={(value) => {
+                recordingBaseTranscriptRef.current = value.trim();
+                recordingSessionFullTranscriptRef.current = "";
+                pendingAutoTranscriptRef.current = value.trim();
+                lastAutoBatchIndexRef.current = 0;
+                autoBatchQueueRef.current = [];
+                autoQueueRunningRef.current = false;
+                setAutoQueueVersion((prev) => prev + 1);
+                setLiveTranscript(value);
+                setTranscriptAnalyzed(false);
+              }}
             />
 
             {statusMsg && (

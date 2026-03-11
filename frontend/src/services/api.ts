@@ -43,7 +43,9 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
         message = `${message}: ${text}`;
       }
     }
-    throw new Error(message);
+    const error = new Error(message) as Error & { status?: number };
+    error.status = resp.status;
+    throw error;
   }
   return resp.json();
 }

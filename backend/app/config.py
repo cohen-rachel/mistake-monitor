@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     # Ollama settings
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "llama3"
+    ollama_timeout_seconds: float = 300.0
 
     # OpenAI settings
     openai_api_key: Optional[str] = None

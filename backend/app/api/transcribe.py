@@ -10,6 +10,26 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/transcribe", tags=["transcribe"])
 
 
+def _normalized_words(text: str) -> list[str]:
+    return [word.lower().strip(".,!?;:\"'()[]{}") for word in text.split()]
+
+
+def _shared_prefix_length(previous_text: str, current_text: str) -> int:
+    previous_words = previous_text.split()
+    current_words = current_text.split()
+    previous_normalized = _normalized_words(previous_text)
+    current_normalized = _normalized_words(current_text)
+
+    shared_prefix = 0
+    max_shared = min(len(previous_words), len(current_words))
+    while shared_prefix < max_shared:
+        if previous_normalized[shared_prefix] != current_normalized[shared_prefix]:
+            break
+        shared_prefix += 1
+
+    return shared_prefix
+
+
 @router.post("")
 async def transcribe_audio(
     audio_file: UploadFile = File(...),
@@ -47,6 +67,8 @@ async def transcribe_stream(websocket: WebSocket):
     language = websocket.query_params.get("language", "en")
     chunk_index = 0
     cumulative_audio = bytearray()
+    previous_full_text = ""
+    committed_word_count = 0
 
     try:
         while True:
@@ -59,6 +81,24 @@ async def transcribe_stream(websocket: WebSocket):
             if "text" in data:
                 text_msg = data["text"]
                 if text_msg.strip().lower() == "stop":
+                    if previous_full_text:
+                        final_words = previous_full_text.split()
+                        remaining_text = " ".join(final_words[committed_word_count:]).strip()
+                        if remaining_text:
+                            logger.info(
+                                "WS transcript payload chunk=%s incremental=%r full=%r",
+                                chunk_index,
+                                remaining_text,
+                                previous_full_text,
+                            )
+                            await websocket.send_json({
+                                "type": "transcript",
+                                "text": remaining_text,
+                                "full_text": previous_full_text,
+                                "chunk_index": chunk_index,
+                                "is_final": True,
+                            })
+                            committed_word_count = len(final_words)
                     await websocket.send_json({
                         "type": "stopped",
                         "chunk_index": chunk_index,
@@ -77,14 +117,31 @@ async def transcribe_stream(websocket: WebSocket):
                     full_text = (result.text or "").strip()
 
                     if full_text:
+                        current_words = full_text.split()
+                        if previous_full_text:
+                            shared_prefix = _shared_prefix_length(previous_full_text, full_text)
+                            stable_word_count = max(shared_prefix, committed_word_count)
+                        else:
+                            stable_word_count = 0
+                        incremental_text = " ".join(
+                            current_words[committed_word_count:stable_word_count]
+                        ).strip()
+                        logger.info(
+                            "WS transcript payload chunk=%s incremental=%r full=%r",
+                            chunk_index,
+                            incremental_text,
+                            full_text,
+                        )
                         await websocket.send_json({
                             "type": "transcript",
-                            "text": full_text,
+                            "text": incremental_text,
                             "full_text": full_text,
                             "chunk_index": chunk_index,
                             "is_final": False,
                             "confidence": result.average_confidence,
                         })
+                        committed_word_count = stable_word_count
+                        previous_full_text = full_text
                     chunk_index += 1
                 except Exception as e:
                     logger.error(f"STT chunk error: {e}")
