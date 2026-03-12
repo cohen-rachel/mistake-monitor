@@ -1,11 +1,22 @@
 # Language Tutor — Personal Language Learning MVP
 
-A full-stack web app that listens to you speak, transcribes your audio, detects language mistakes, categorizes them, and tracks your improvement over time.
+Hello and welcome! I made this repo because I am both a part-time Language Teacher and a Language learner myself! This is the exact app that I have been looking for, while also encorporating practices I use in my own lessons with my students to help them understand mistakes they are making often. 
+
+This app is developed by me personally, with the help of AI. 
+
+This is a full-stack web and mobile app that:
+  - listens to you speak and transcribes your audio, 
+  - detects your mistakes in the language you are learning,
+  - categorizes them, and 
+  - tracks your improvement over time.
+
+This is an MVP which is in active development :) 
 
 ## Architecture
 
 ```
-frontend/    → React (Vite) SPA
+frontend/    → React (Vite) web app
+mobile/      → React Native app with Expo SDK 54
 backend/     → Python FastAPI async API
 SQLite       → Local database (swap to Postgres via env var)
 ```
@@ -21,6 +32,7 @@ SQLite       → Local database (swap to Postgres via env var)
 - **Python 3.11+**
 - **Node.js 18+**
 - **Ollama** (for LLM analysis — default provider)
+- **Expo Go** or an iOS/Android simulator for the mobile app
 
 ### 1. Backend
 
@@ -60,7 +72,38 @@ npm run dev
 
 Open **http://localhost:3000** in your browser.
 
-### 3. Ollama (for LLM analysis)
+### 3. Mobile App
+
+```bash
+cd mobile
+
+# Install dependencies
+npm install
+
+# Start Expo
+npx expo start
+```
+
+The mobile app talks directly to the backend API. Set `EXPO_PUBLIC_API_BASE_URL`
+before starting Expo if `localhost` is not correct for your simulator or device.
+
+Examples:
+
+```bash
+EXPO_PUBLIC_API_BASE_URL=http://127.0.0.1:8000/api npx expo start
+EXPO_PUBLIC_API_BASE_URL=http://192.168.1.10:8000/api npx expo start
+```
+
+Notes:
+
+- Expo Go on a physical phone cannot use `localhost` for your Mac-hosted backend.
+- Start the backend with `--host 0.0.0.0` if you want a phone on the same network to reach it:
+
+```bash
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+### 4. Ollama (for LLM analysis)
 
 ```bash
 # Install Ollama: https://ollama.ai
@@ -81,7 +124,9 @@ docker compose up --build
 # API docs: http://localhost:8000/docs
 ```
 
-Note: For Ollama access from Docker, the compose file uses `host.docker.internal:11434`. Ensure Ollama is running on the host machine.
+Note: Docker currently covers the backend and web frontend. The Expo mobile app runs separately from `mobile/`.
+
+For Ollama access from Docker, the compose file uses `host.docker.internal:11434`. Ensure Ollama is running on the host machine.
 
 ## Environment Variables
 
@@ -97,6 +142,8 @@ Note: For Ollama access from Docker, the compose file uses `host.docker.internal
 | `ANTHROPIC_MODEL` | `claude-sonnet-4-20250514` | Anthropic model |
 | `DATABASE_URL` | `sqlite+aiosqlite:///./langtutor.db` | DB connection string |
 | `DEFAULT_LANGUAGE` | `en` | Target language code |
+| `CORS_ALLOW_ORIGINS` | `http://localhost:3000,http://127.0.0.1:3000` | Comma-separated explicit CORS origins |
+| `CORS_ALLOW_ORIGIN_REGEX` | local/LAN dev regex | Regex for localhost and common LAN Expo/web development hosts |
 
 ## Swapping Providers
 
@@ -150,6 +197,9 @@ pip install asyncpg
 | `GET` | `/api/insights` | Get aggregated mistake insights & trends |
 | `GET` | `/api/topics` | Topic suggestions based on estimated level |
 | `GET` | `/api/topics/history` | Historical attempts for a specific topic |
+| `GET` | `/api/user/language_profiles` | List available language profiles |
+| `GET` | `/api/user/language_profiles/current` | Get current language profile |
+| `PUT` | `/api/user/language_profiles/set_current` | Switch current language profile |
 | `GET` | `/api/health` | Health check |
 
 Interactive API docs available at **http://localhost:8000/docs** (Swagger UI).
@@ -161,6 +211,17 @@ Interactive API docs available at **http://localhost:8000/docs** (Swagger UI).
 | `/` | Home — Record audio (real-time transcription) or upload a file |
 | `/history` | Browse past sessions with transcripts and analysis |
 | `/insights` | Top mistakes, error trend chart, and recent corrections list |
+| `/rewrite` | Rewrite training based on previously detected mistakes |
+
+## Mobile App
+
+- Built with **Expo SDK 54**
+- Uses the same FastAPI backend as the web app
+- Supports recording/upload flows, history, insights, rewrite practice, and language-profile switching
+- Expo/mobile-specific backend support includes:
+  - broader local/LAN CORS support
+  - audio uploads that preserve file type metadata such as `m4a`, `mp3`, `wav`, and `webm`
+  - websocket transcription support compatible with web binary chunks and Expo-style JSON/base64 chunk messages
 
 ## Language-Aware Analysis
 
@@ -185,7 +246,8 @@ Interactive API docs available at **http://localhost:8000/docs** (Swagger UI).
 
 ## Tech Stack
 
-- **Frontend:** React 18, Vite, TypeScript, React Router, Recharts
+- **Web Frontend:** React 18, Vite, TypeScript, React Router, Recharts
+- **Mobile Frontend:** React Native, Expo SDK 54, TypeScript, `react-native-svg`
 - **Backend:** Python 3.11, FastAPI, SQLAlchemy 2.0 (async), Alembic, Pydantic v2
 - **Database:** SQLite (dev) / PostgreSQL (prod)
 - **STT:** OpenAI Whisper API / faster-whisper / dummy
