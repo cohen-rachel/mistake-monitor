@@ -23,11 +23,23 @@ class STTProvider(ABC):
     """Abstract speech-to-text provider."""
 
     @abstractmethod
-    async def transcribe(self, audio_bytes: bytes, language: str = "en") -> TranscriptResult:
+    async def transcribe(
+        self,
+        audio_bytes: bytes,
+        language: str = "en",
+        filename: str | None = None,
+        content_type: str | None = None,
+    ) -> TranscriptResult:
         """Transcribe audio bytes and return a TranscriptResult."""
         ...
 
     @abstractmethod
-    async def transcribe_chunk(self, audio_bytes: bytes, language: str = "en") -> TranscriptResult:
+    async def transcribe_chunk(
+        self,
+        audio_bytes: bytes,
+        language: str = "en",
+        filename: str | None = None,
+        content_type: str | None = None,
+    ) -> TranscriptResult:
         """Transcribe a short audio chunk (for streaming)."""
         ...

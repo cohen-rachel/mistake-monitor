@@ -8,6 +8,7 @@ import logging
 import tempfile
 import os
 from app.services.stt.base import STTProvider, TranscriptResult, TranscriptSegment
+from app.services.stt.audio_utils import infer_audio_suffix
 
 logger = logging.getLogger(__name__)
 
@@ -33,26 +34,58 @@ class WhisperLocalProvider(STTProvider):
             logger.info("faster-whisper model loaded.")
         return self._model
 
-    async def transcribe(self, audio_bytes: bytes, language: str = "en") -> TranscriptResult:
-        return await self._run_whisper(audio_bytes, language)
+    async def transcribe(
+        self,
+        audio_bytes: bytes,
+        language: str = "en",
+        filename: str | None = None,
+        content_type: str | None = None,
+    ) -> TranscriptResult:
+        return await self._run_whisper(audio_bytes, language, filename, content_type)
 
-    async def transcribe_chunk(self, audio_bytes: bytes, language: str = "en") -> TranscriptResult:
-        return await self._run_whisper(audio_bytes, language)
+    async def transcribe_chunk(
+        self,
+        audio_bytes: bytes,
+        language: str = "en",
+        filename: str | None = None,
+        content_type: str | None = None,
+    ) -> TranscriptResult:
+        return await self._run_whisper(audio_bytes, language, filename, content_type)
 
-    async def _run_whisper(self, audio_bytes: bytes, language: str) -> TranscriptResult:
+    async def _run_whisper(
+        self,
+        audio_bytes: bytes,
+        language: str,
+        filename: str | None = None,
+        content_type: str | None = None,
+    ) -> TranscriptResult:
         import asyncio
 
         if not audio_bytes or len(audio_bytes) < 100:
             return TranscriptResult(text="", segments=[], average_confidence=0.0)
 
         loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(None, self._sync_transcribe, audio_bytes, language)
+        return await loop.run_in_executor(
+            None,
+            self._sync_transcribe,
+            audio_bytes,
+            language,
+            filename,
+            content_type,
+        )
 
-    def _sync_transcribe(self, audio_bytes: bytes, language: str) -> TranscriptResult:
+    def _sync_transcribe(
+        self,
+        audio_bytes: bytes,
+        language: str,
+        filename: str | None = None,
+        content_type: str | None = None,
+    ) -> TranscriptResult:
         model = self._get_model()
 
         # Write audio to temp file (faster-whisper needs a file path)
-        with tempfile.NamedTemporaryFile(suffix=".webm", delete=False) as f:
+        suffix = infer_audio_suffix(filename=filename, content_type=content_type)
+        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as f:
             f.write(audio_bytes)
             tmp_path = f.name
 

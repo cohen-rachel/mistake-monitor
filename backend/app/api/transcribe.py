@@ -1,5 +1,7 @@
 """Transcription endpoints: REST and WebSocket streaming."""
 
+import base64
+import json
 import logging
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, UploadFile, File, Form
 
@@ -38,7 +40,12 @@ async def transcribe_audio(
     """Transcribe an uploaded audio file and return the transcript."""
     audio_bytes = await audio_file.read()
     stt = get_stt_provider()
-    result = await stt.transcribe(audio_bytes, language)
+    result = await stt.transcribe(
+        audio_bytes,
+        language,
+        filename=audio_file.filename,
+        content_type=audio_file.content_type,
+    )
 
     return {
         "text": result.text,
@@ -55,6 +62,13 @@ async def transcribe_audio(
     }
 
 
+def _decode_base64_audio(payload: str) -> bytes:
+    try:
+        return base64.b64decode(payload, validate=True)
+    except Exception as exc:
+        raise ValueError("Invalid base64 audio payload") from exc
+
+
 @router.websocket("/stream")
 async def transcribe_stream(websocket: WebSocket):
     """WebSocket endpoint for real-time audio transcription.
@@ -65,6 +79,8 @@ async def transcribe_stream(websocket: WebSocket):
     await websocket.accept()
     stt = get_stt_provider()
     language = websocket.query_params.get("language", "en")
+    stream_filename = websocket.query_params.get("filename")
+    stream_content_type = websocket.query_params.get("content_type")
     chunk_index = 0
     cumulative_audio = bytearray()
     previous_full_text = ""
@@ -104,6 +120,98 @@ async def transcribe_stream(websocket: WebSocket):
                         "chunk_index": chunk_index,
                     })
                     break
+                try:
+                    message = json.loads(text_msg)
+                except json.JSONDecodeError:
+                    continue
+
+                msg_type = message.get("type")
+                if msg_type == "config":
+                    language = message.get("language", language) or language
+                    stream_filename = message.get("filename") or message.get("file_name") or stream_filename
+                    stream_content_type = message.get("content_type") or stream_content_type
+                    continue
+
+                if msg_type == "stop":
+                    if previous_full_text:
+                        final_words = previous_full_text.split()
+                        remaining_text = " ".join(final_words[committed_word_count:]).strip()
+                        if remaining_text:
+                            await websocket.send_json({
+                                "type": "transcript",
+                                "text": remaining_text,
+                                "full_text": previous_full_text,
+                                "chunk_index": chunk_index,
+                                "is_final": True,
+                            })
+                    await websocket.send_json({
+                        "type": "stopped",
+                        "chunk_index": chunk_index,
+                    })
+                    break
+
+                if msg_type != "audio_chunk":
+                    continue
+
+                payload = message.get("data")
+                if not payload:
+                    await websocket.send_json({
+                        "type": "error",
+                        "message": "Missing audio chunk payload",
+                        "chunk_index": chunk_index,
+                    })
+                    continue
+                try:
+                    audio_bytes = _decode_base64_audio(payload)
+                except ValueError as exc:
+                    await websocket.send_json({
+                        "type": "error",
+                        "message": str(exc),
+                        "chunk_index": chunk_index,
+                    })
+                    continue
+
+                stream_filename = message.get("filename") or message.get("file_name") or stream_filename
+                stream_content_type = message.get("content_type") or stream_content_type
+
+                try:
+                    cumulative_audio.extend(audio_bytes)
+                    result = await stt.transcribe(
+                        bytes(cumulative_audio),
+                        language=language,
+                        filename=stream_filename,
+                        content_type=stream_content_type,
+                    )
+                    full_text = (result.text or "").strip()
+
+                    if full_text:
+                        current_words = full_text.split()
+                        if previous_full_text:
+                            shared_prefix = _shared_prefix_length(previous_full_text, full_text)
+                            stable_word_count = max(shared_prefix, committed_word_count)
+                        else:
+                            stable_word_count = 0
+                        incremental_text = " ".join(
+                            current_words[committed_word_count:stable_word_count]
+                        ).strip()
+                        await websocket.send_json({
+                            "type": "transcript",
+                            "text": incremental_text,
+                            "full_text": full_text,
+                            "chunk_index": chunk_index,
+                            "is_final": False,
+                            "confidence": result.average_confidence,
+                        })
+                        committed_word_count = stable_word_count
+                        previous_full_text = full_text
+                    chunk_index += 1
+                except Exception as e:
+                    logger.error(f"STT chunk error: {e}")
+                    await websocket.send_json({
+                        "type": "error",
+                        "message": str(e),
+                        "chunk_index": chunk_index,
+                    })
                 continue
 
             if "bytes" in data:
@@ -113,7 +221,12 @@ async def transcribe_stream(websocket: WebSocket):
                     # Transcribing each fragment independently can fail. Keep a cumulative
                     # buffer and transcribe that instead, then emit only new text.
                     cumulative_audio.extend(audio_bytes)
-                    result = await stt.transcribe(bytes(cumulative_audio), language=language)
+                    result = await stt.transcribe(
+                        bytes(cumulative_audio),
+                        language=language,
+                        filename=stream_filename,
+                        content_type=stream_content_type,
+                    )
                     full_text = (result.text or "").strip()
 
                     if full_text:

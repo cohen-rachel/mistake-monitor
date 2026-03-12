@@ -24,14 +24,26 @@ _chunk_index = 0
 class DummySTTProvider(STTProvider):
     """Returns canned transcript for testing. No ML dependencies required."""
 
-    async def transcribe(self, audio_bytes: bytes, language: str = "en") -> TranscriptResult:
+    async def transcribe(
+        self,
+        audio_bytes: bytes,
+        language: str = "en",
+        filename: str | None = None,
+        content_type: str | None = None,
+    ) -> TranscriptResult:
         return TranscriptResult(
             text=DUMMY_TRANSCRIPT,
             segments=DUMMY_SEGMENTS,
             average_confidence=0.884,
         )
 
-    async def transcribe_chunk(self, audio_bytes: bytes, language: str = "en") -> TranscriptResult:
+    async def transcribe_chunk(
+        self,
+        audio_bytes: bytes,
+        language: str = "en",
+        filename: str | None = None,
+        content_type: str | None = None,
+    ) -> TranscriptResult:
         global _chunk_index
         idx = _chunk_index % len(DUMMY_SEGMENTS)
         _chunk_index += 1

@@ -3,6 +3,7 @@
 import httpx
 from app.config import settings
 from app.services.stt.base import STTProvider, TranscriptResult, TranscriptSegment
+from app.services.stt.audio_utils import infer_audio_filename
 
 
 class WhisperAPIProvider(STTProvider):
@@ -14,16 +15,43 @@ class WhisperAPIProvider(STTProvider):
         self.api_key = settings.openai_api_key
         self.base_url = "https://api.openai.com/v1/audio/transcriptions"
 
-    async def transcribe(self, audio_bytes: bytes, language: str = "en") -> TranscriptResult:
-        return await self._call_whisper(audio_bytes, language)
+    async def transcribe(
+        self,
+        audio_bytes: bytes,
+        language: str = "en",
+        filename: str | None = None,
+        content_type: str | None = None,
+    ) -> TranscriptResult:
+        return await self._call_whisper(audio_bytes, language, filename, content_type)
 
-    async def transcribe_chunk(self, audio_bytes: bytes, language: str = "en") -> TranscriptResult:
-        return await self._call_whisper(audio_bytes, language)
+    async def transcribe_chunk(
+        self,
+        audio_bytes: bytes,
+        language: str = "en",
+        filename: str | None = None,
+        content_type: str | None = None,
+    ) -> TranscriptResult:
+        return await self._call_whisper(audio_bytes, language, filename, content_type)
 
-    async def _call_whisper(self, audio_bytes: bytes, language: str) -> TranscriptResult:
+    async def _call_whisper(
+        self,
+        audio_bytes: bytes,
+        language: str,
+        filename: str | None = None,
+        content_type: str | None = None,
+    ) -> TranscriptResult:
         headers = {"Authorization": f"Bearer {self.api_key}"}
+        upload_name = infer_audio_filename(
+            filename=filename,
+            content_type=content_type,
+            default_stem="audio",
+        )
         files = {
-            "file": ("audio.webm", audio_bytes, "audio/webm"),
+            "file": (
+                upload_name,
+                audio_bytes,
+                content_type or "application/octet-stream",
+            ),
         }
         data = {
             "model": "whisper-1",

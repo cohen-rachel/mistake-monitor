@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
+from app.config import settings
 from app.database import engine, Base, async_session_factory
 from app.seed import seed_mistake_types
 from app.api import sessions, transcribe, analyze, insights, topics, rewrite, language_profiles
@@ -23,6 +24,14 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger(__name__)
+
+
+def _cors_origins() -> list[str]:
+    return [
+        origin.strip()
+        for origin in settings.cors_allow_origins.split(",")
+        if origin.strip()
+    ]
 
 
 async def _ensure_sqlite_schema_compatibility() -> None:
@@ -96,7 +105,8 @@ app = FastAPI(
 # CORS — allow frontend dev server
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=_cors_origins(),
+    allow_origin_regex=settings.cors_allow_origin_regex,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

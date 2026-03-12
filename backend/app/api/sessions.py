@@ -3,11 +3,13 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 from typing import Optional
 
 from app.database import get_db
 from app.config import settings
 from app.models import (
+    Mistake,
     Session,
     Transcript,
     User,
@@ -33,6 +35,21 @@ def _language_display_name(language: str) -> str:
         "pt": "Portuguese",
     }
     return names.get(language, language.upper())
+
+
+async def _load_session_detail(db: AsyncSession, session_id: int) -> Session:
+    result = await db.execute(
+        select(Session)
+        .where(Session.id == session_id)
+        .options(
+            selectinload(Session.transcript),
+            selectinload(Session.mistakes).selectinload(Mistake.mistake_type),
+        )
+    )
+    session = result.scalar_one_or_none()
+    if session is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return session
 
 
 @router.post("", response_model=SessionDetailOut)
@@ -83,7 +100,12 @@ async def create_session(
     if audio_file and not transcript_text:
         audio_bytes = await audio_file.read()
         stt = get_stt_provider()
-        result = await stt.transcribe(audio_bytes, language_code)
+        result = await stt.transcribe(
+            audio_bytes,
+            language_code,
+            filename=audio_file.filename,
+            content_type=audio_file.content_type,
+        )
         transcript_text = result.text
         stt_confidence = result.average_confidence
         tokens_with_timestamps = [
@@ -151,8 +173,7 @@ async def create_session(
         except Exception:
             pass  # Analysis failure shouldn't block session creation
 
-    await db.refresh(session)
-    return session
+    return await _load_session_detail(db, session.id)
 
 
 @router.get("", response_model=SessionListOut)
@@ -175,8 +196,4 @@ async def list_sessions(
 @router.get("/{session_id}", response_model=SessionDetailOut)
 async def get_session(session_id: int, db: AsyncSession = Depends(get_db)):
     """Get a session with full transcript and analysis."""
-    result = await db.execute(select(Session).where(Session.id == session_id))
-    session = result.scalar_one_or_none()
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
-    return session
+    return await _load_session_detail(db, session_id)

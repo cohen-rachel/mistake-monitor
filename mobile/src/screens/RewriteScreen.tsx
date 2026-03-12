@@ -1,0 +1,335 @@
+import React, { useEffect, useState } from "react";
+import { StyleSheet, Text, TextInput, View } from "react-native";
+import Screen from "../components/Screen";
+import SectionCard from "../components/SectionCard";
+import PrimaryButton from "../components/PrimaryButton";
+import {
+  getRewriteExercise,
+  getRewriteStats,
+  submitRewriteExercise,
+} from "../services/api";
+import { useLanguageContext } from "../contexts/LanguageContext";
+import type {
+  RewriteExerciseResponse,
+  RewriteStatsResponse,
+} from "../types";
+import { colors } from "../theme";
+
+export default function RewriteScreen() {
+  const { currentLanguageProfile, isLoadingLanguage } = useLanguageContext();
+  const [exercise, setExercise] = useState<RewriteExerciseResponse | null>(null);
+  const [stats, setStats] = useState<RewriteStatsResponse | null>(null);
+  const [answer, setAnswer] = useState("");
+  const [feedback, setFeedback] = useState<string | null>(null);
+  const [skipMessage, setSkipMessage] = useState("");
+  const [noMistakesMessage, setNoMistakesMessage] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [seenMistakeIds, setSeenMistakeIds] = useState<number[]>([]);
+  const [hasSubmitted, setHasSubmitted] = useState(false);
+
+  const loadStats = async () => {
+    if (!currentLanguageProfile) {
+      return;
+    }
+    try {
+      const loaded = await getRewriteStats(currentLanguageProfile.language_code);
+      setStats(loaded);
+    } catch {
+      setStats(null);
+    }
+  };
+
+  const loadExercise = async (options?: {
+    postMessage?: string;
+    excludeIds?: number[];
+  }) => {
+    if (!currentLanguageProfile) {
+      return;
+    }
+    setLoading(true);
+    setFeedback(null);
+    setSkipMessage("");
+    setNoMistakesMessage(null);
+    setAnswer("");
+    setHasSubmitted(false);
+    try {
+      const loaded = await getRewriteExercise(
+        currentLanguageProfile.language_code,
+        1,
+        options?.excludeIds
+      );
+      setExercise(loaded);
+      if (!seenMistakeIds.includes(loaded.source_mistake_id)) {
+        setSeenMistakeIds((prev) => [...prev, loaded.source_mistake_id]);
+      }
+      if (options?.postMessage) {
+        setSkipMessage(options.postMessage);
+      }
+    } catch (err: any) {
+      setExercise(null);
+      const message =
+        err?.message && /no mistakes/i.test(err.message)
+          ? "No mistakes to correct at this time."
+          : null;
+      setNoMistakesMessage(message);
+      if (message) {
+        setSeenMistakeIds([]);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!currentLanguageProfile) {
+      return;
+    }
+    void loadExercise();
+    void loadStats();
+  }, [currentLanguageProfile]);
+
+  const handleSubmit = async () => {
+    if (!exercise || !answer.trim() || !currentLanguageProfile) {
+      return;
+    }
+    setLoading(true);
+    try {
+      const result = await submitRewriteExercise({
+        user_id: 1,
+        language_code: currentLanguageProfile.language_code,
+        source_mistake_id: exercise.source_mistake_id,
+        original_sentence: exercise.original_sentence,
+        wrong_span: exercise.wrong_span,
+        expected_correction: exercise.expected_correction,
+        user_rewrite: answer.trim(),
+      });
+      const expected = result.expected_correction
+        ? ` Expected correction: ${result.expected_correction}`
+        : "";
+      setFeedback(
+        `${result.is_correct ? "Correct." : "Not quite."} Score ${Math.round(
+          result.score * 100
+        )}%. ${result.feedback}${expected}`
+      );
+      await loadStats();
+      setHasSubmitted(true);
+    } catch (err: any) {
+      setFeedback(err?.message || "Could not submit rewrite.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Screen>
+      <Text style={styles.title}>Rewrite Practice</Text>
+      {isLoadingLanguage ? (
+        <SectionCard>
+          <Text style={styles.muted}>Loading language profile...</Text>
+        </SectionCard>
+      ) : !currentLanguageProfile ? (
+        <SectionCard>
+          <Text style={styles.muted}>
+            Please select or create a language profile to start rewriting exercises.
+          </Text>
+        </SectionCard>
+      ) : (
+        <>
+          <Text style={styles.subtitle}>
+            You get your original incorrect sentence and rewrite it correctly.
+          </Text>
+          <SectionCard>
+            <Text style={styles.sectionTitle}>Exercise</Text>
+            {loading && !exercise ? (
+              <Text style={styles.muted}>Loading exercise...</Text>
+            ) : exercise ? (
+              <>
+                <Text style={styles.meta}>{exercise.mistake_type_label}</Text>
+                <Text style={styles.original}>{exercise.original_sentence}</Text>
+                <TextInput
+                  value={answer}
+                  onChangeText={setAnswer}
+                  placeholder="Rewrite the sentence correctly..."
+                  placeholderTextColor={colors.textSoft}
+                  multiline
+                  style={styles.input}
+                />
+                <View style={styles.buttonStack}>
+                  <PrimaryButton
+                    label={hasSubmitted ? "Next Sentence" : "Submit Rewrite"}
+                    onPress={() => {
+                      if (hasSubmitted) {
+                        void loadExercise({
+                          postMessage: "Next sentence loaded.",
+                          excludeIds: [...seenMistakeIds],
+                        });
+                        return;
+                      }
+                      void handleSubmit();
+                    }}
+                    disabled={!hasSubmitted && !answer.trim()}
+                    loading={loading}
+                  />
+                  {!hasSubmitted ? (
+                    <PrimaryButton
+                      label="Skip"
+                      onPress={() => {
+                        void loadExercise({
+                          postMessage: "Skipped to the next mistake.",
+                          excludeIds: [...seenMistakeIds],
+                        });
+                      }}
+                      tone="neutral"
+                      disabled={loading}
+                    />
+                  ) : null}
+                </View>
+                {feedback || skipMessage ? (
+                  <Text style={styles.feedback}>{feedback || skipMessage}</Text>
+                ) : null}
+              </>
+            ) : (
+              <Text style={styles.muted}>
+                {noMistakesMessage ||
+                  "No rewrite exercises available yet. Analyze a few sessions first."}
+              </Text>
+            )}
+          </SectionCard>
+
+          <SectionCard>
+            <Text style={styles.sectionTitle}>Rewrite Stats</Text>
+            {loading && !stats ? (
+              <Text style={styles.muted}>Loading stats...</Text>
+            ) : !stats ? (
+              <Text style={styles.muted}>No stats yet.</Text>
+            ) : (
+              <>
+                <Text style={styles.summary}>
+                  Overall accuracy:{" "}
+                  <Text style={styles.strong}>
+                    {Math.round(stats.overall_accuracy * 100)}%
+                  </Text>{" "}
+                  ({stats.total_correct}/{stats.total_attempts})
+                </Text>
+                {stats.recent_attempts.slice(0, 8).map((item, index) => (
+                  <View
+                    key={`${item.wrong_span || "unknown"}-${index}`}
+                    style={[
+                      styles.attemptRow,
+                      index === 0 ? null : styles.attemptRowBorder,
+                    ]}
+                  >
+                    <Text style={styles.attemptText}>
+                      <Text style={styles.wrong}>
+                        {item.wrong_span || "(unknown)"}
+                      </Text>
+                      {" -> "}
+                      <Text style={styles.correct}>
+                        {item.expected_correction || "(unknown)"}
+                      </Text>
+                    </Text>
+                    <Text style={styles.attemptMeta}>
+                      Accuracy {Math.round(item.accuracy * 100)}%
+                      {item.latest_result !== undefined
+                        ? item.latest_result
+                          ? " | latest correct"
+                          : " | latest incorrect"
+                        : ""}
+                    </Text>
+                  </View>
+                ))}
+              </>
+            )}
+          </SectionCard>
+        </>
+      )}
+    </Screen>
+  );
+}
+
+const styles = StyleSheet.create({
+  title: {
+    color: colors.text,
+    fontSize: 28,
+    fontWeight: "800",
+    marginBottom: 8,
+  },
+  subtitle: {
+    color: colors.textMuted,
+    marginBottom: 16,
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  sectionTitle: {
+    color: colors.text,
+    fontSize: 18,
+    fontWeight: "800",
+    marginBottom: 12,
+  },
+  meta: {
+    color: colors.textSoft,
+    marginBottom: 8,
+  },
+  original: {
+    color: colors.text,
+    fontSize: 16,
+    lineHeight: 24,
+    marginBottom: 10,
+  },
+  input: {
+    minHeight: 96,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    padding: 12,
+    fontSize: 15,
+    color: colors.text,
+    textAlignVertical: "top",
+    marginBottom: 12,
+  },
+  buttonStack: {
+    gap: 10,
+  },
+  feedback: {
+    marginTop: 12,
+    color: colors.textMuted,
+    lineHeight: 20,
+  },
+  summary: {
+    color: colors.textMuted,
+    marginBottom: 12,
+    lineHeight: 20,
+  },
+  strong: {
+    color: colors.text,
+    fontWeight: "800",
+  },
+  attemptRow: {
+    paddingVertical: 10,
+  },
+  attemptRowBorder: {
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  attemptText: {
+    color: colors.textMuted,
+    lineHeight: 20,
+  },
+  attemptMeta: {
+    color: colors.textSoft,
+    marginTop: 4,
+    fontSize: 13,
+  },
+  wrong: {
+    color: "#b91c1c",
+    fontWeight: "700",
+  },
+  correct: {
+    color: "#166534",
+    fontWeight: "700",
+  },
+  muted: {
+    color: colors.textSoft,
+    fontSize: 14,
+  },
+});
