@@ -13,3 +13,151 @@ advanced|education_reform|Explain one change you would make to education and why
 advanced|culture_identity|Talk about how culture shapes personal identity.
 advanced|environment_policy|Give your opinion on one environmental policy.
 advanced|future_society|Predict one major social change in the next 20 years.
+beginner|favorite_hobbies|Talk about favorite hobbies.
+beginner|weekend_plans|Talk about weekend plans.
+beginner|recent_movies_or_tv_shows|Talk about recent movies or tv shows.
+beginner|favorite_books|Talk about favorite books.
+beginner|travel_experiences|Talk about travel experiences.
+beginner|dream_vacation_destinations|Talk about dream vacation destinations.
+beginner|food_preferences|Talk about food preferences.
+beginner|favorite_type_of_music|Talk about favorite type of music.
+beginner|recent_concerts_or_live_performances|Talk about recent concerts or live performances.
+beginner|fitness_and_exercise_routines|Talk about fitness and exercise routines.
+beginner|pet_stories_or_experiences|Talk about pet stories or experiences.
+beginner|childhood_memories|Talk about childhood memories.
+beginner|technology_and_gadgets|Talk about technology and gadgets.
+beginner|social_media_platforms_and_usage|Talk about social media platforms and usage.
+beginner|current_events|Talk about current events.
+beginner|weather_and_seasons|Talk about weather and seasons.
+beginner|sports_and_favorite_teams|Talk about sports and favorite teams.
+beginner|family_traditions|Talk about family traditions.
+beginner|career_aspirations|Talk about career aspirations.
+beginner|education_and_favorite_subjects|Talk about education and favorite subjects.
+beginner|goals_for_the_future|Talk about goals for the future.
+beginner|favorite_type_of_cuisine|Talk about favorite type of cuisine.
+beginner|cultural_experiences|Talk about cultural experiences.
+beginner|volunteer_work_or_community_involvement|Talk about volunteer work or community involvement.
+beginner|inspirational_quotes_or_sayings|Talk about inspirational quotes or sayings.
+beginner|personal_achievements|Talk about personal achievements.
+beginner|art_and_creative_expression|Talk about art and creative expression.
+beginner|personal_development_goals|Talk about personal development goals.
+beginner|fashion_and_style_preferences|Talk about fashion and style preferences.
+beginner|recent_funny_or_interesting_anecdotes|Talk about recent funny or interesting anecdotes.
+beginner|music_playlists_or_recommendations|Talk about music playlists or recommendations.
+beginner|gardening_or_plants|Talk about gardening or plants.
+beginner|relationship_experiences|Talk about relationship experiences.
+beginner|festivals_or_events_attended|Talk about festivals or events attended.
+beginner|unique_talents_or_skills|Talk about unique talents or skills.
+beginner|languages_spoken_or_learned|Talk about languages spoken or learned.
+beginner|board_games_or_card_games|Talk about board games or card games.
+beginner|childhood_heroes_or_role_models|Talk about childhood heroes or role models.
+beginner|podcasts_or_youtube_channels|Talk about podcasts or youtube channels.
+beginner|favorite_holiday_traditions|Talk about favorite holiday traditions.
+beginner|diy_projects|Talk about diy projects.
+beginner|science_and_discoveries|Talk about science and discoveries.
+beginner|weekend_getaways|Talk about weekend getaways.
+beginner|favorite_restaurants|Talk about favorite restaurants.
+beginner|fitness_goals|Talk about fitness goals.
+beginner|environmental_awareness|Talk about environmental awareness.
+beginner|hidden_talents|Talk about hidden talents.
+beginner|daily_routines|Talk about daily routines.
+beginner|inspirational_movies_or_quotes|Talk about inspirational movies or quotes.
+beginner|recent_accomplishments|Talk about recent accomplishments.
+beginner|cooking_or_baking_experiences|Talk about cooking or baking experiences.
+beginner|unusual_or_interesting_facts|Talk about unusual or interesting facts.
+beginner|outdoor_activities|Talk about outdoor activities.
+beginner|health_and_wellness_routines|Talk about health and wellness routines.
+beginner|favorite_apps_on_your_phone|Talk about favorite apps on your phone.
+beginner|learning_new_skills|Talk about learning new skills.
+beginner|personal_challenges|Talk about personal challenges.
+beginner|artistic_preferences|Talk about artistic preferences.
+beginner|bucket_list_items|Talk about bucket list items.
+beginner|home_decor_and_design|Talk about home decor and design.
+beginner|personal_values|Talk about personal values.
+beginner|memorable_vacations|Talk about memorable vacations.
+beginner|recent_purchases|Talk about recent purchases.
+beginner|historical_events_of_interest|Talk about historical events of interest.
+beginner|favorite_ice_cream_flavors|Talk about favorite ice cream flavors.
+beginner|comedy_shows_or_stand_up_specials|Talk about comedy shows or stand-up specials.
+beginner|dreams_and_aspirations|Talk about dreams and aspirations.
+beginner|memorable_birthdays|Talk about memorable birthdays.
+beginner|festivals_attended|Talk about festivals attended.
+beginner|technology_trends|Talk about technology trends.
+beginner|favorite_quotes|Talk about favorite quotes.
+beginner|unique_or_uncommon_experiences|Talk about unique or uncommon experiences.
+beginner|cars_and_driving_experiences|Talk about cars and driving experiences.
+beginner|adventure_sports_or_activities|Talk about adventure sports or activities.
+beginner|community_involvement|Talk about community involvement.
+beginner|role_models_in_your_life|Talk about role models in your life.
+beginner|music_instruments_played_or_admired|Talk about music instruments played or admired.
+beginner|fashion_trends|Talk about fashion trends.
+beginner|art_exhibits_or_museums_visited|Talk about art exhibits or museums visited.
+beginner|favorite_board_games|Talk about favorite board games.
+beginner|educational_goals|Talk about educational goals.
+beginner|cultural_celebrations|Talk about cultural celebrations.
+beginner|coffee_or_tea_preferences|Talk about coffee or tea preferences.
+beginner|spiritual_or_philosophical_beliefs|Talk about spiritual or philosophical beliefs.
+beginner|personal_milestones|Talk about personal milestones.
+beginner|science_fiction_or_fantasy_interests|Talk about science fiction or fantasy interests.
+beginner|favorite_desserts|Talk about favorite desserts.
+beginner|diy_home_improvement_projects|Talk about diy home improvement projects.
+beginner|personal_mantras|Talk about personal mantras.
+beginner|recent_discoveries|Talk about recent discoveries.
+beginner|unique_or_funny_pet_stories|Talk about unique or funny pet stories.
+beginner|career_highlights|Talk about career highlights.
+beginner|inspirational_figures|Talk about inspirational figures.
+beginner|favorite_childhood_games|Talk about favorite childhood games.
+beginner|personal_quirks_or_habits|Talk about personal quirks or habits.
+beginner|languages_spoken_or_learned_2|Talk about languages spoken or learned.
+beginner|recent_challenges_and_how_you_overcame_them|Talk about recent challenges and how you overcame them.
+beginner|weekend_rituals|Talk about weekend rituals.
+beginner|artistic_inspirations|Talk about artistic inspirations.
+beginner|personal_fashion_style|Talk about personal fashion style.
+advanced|artificial_intelligence_and_its_impact_on_society|Talk about artificial intelligence and its impact on society.
+advanced|quantum_computing_and_its_potential_applications|Talk about quantum computing and its potential applications.
+advanced|ethical_considerations_in_technology_and_science|Talk about ethical considerations in technology and science.
+advanced|future_of_space_exploration_and_colonization|Talk about future of space exploration and colonization.
+advanced|climate_change_and_environmental_sustainability|Talk about climate change and environmental sustainability.
+advanced|global_economic_trends_and_challenges|Talk about global economic trends and challenges.
+advanced|emerging_trends_in_healthcare_and_medical_technology|Talk about emerging trends in healthcare and medical technology.
+advanced|advances_in_renewable_energy_sources|Talk about advances in renewable energy sources.
+advanced|neuroscientific_discoveries_and_their_implications|Talk about neuroscientific discoveries and their implications.
+advanced|the_role_of_genetics_in_personalized_medicine|Talk about the role of genetics in personalized medicine.
+advanced|philosophy_of_mind_and_consciousness|Talk about philosophy of mind and consciousness.
+advanced|intersectionality_and_social_justice_issues|Talk about intersectionality and social justice issues.
+advanced|evolution_of_language_and_communication|Talk about evolution of language and communication.
+advanced|modern_approaches_to_education_and_learning|Talk about modern approaches to education and learning.
+advanced|cybersecurity_threats_and_solutions|Talk about cybersecurity threats and solutions.
+advanced|the_impact_of_automation_on_the_workforce|Talk about the impact of automation on the workforce.
+advanced|global_political_shifts_and_geopolitical_hotspots|Talk about global political shifts and geopolitical hotspots.
+advanced|augmented_reality_and_virtual_reality_applications|Talk about augmented reality and virtual reality applications.
+advanced|biotechnology_and_genetic_engineering|Talk about biotechnology and genetic engineering.
+advanced|innovations_in_sustainable_architecture_and_design|Talk about innovations in sustainable architecture and design.
+advanced|the_future_of_transportation_including_electric_and_autonomous_vehicles|Talk about the future of transportation, including electric and autonomous vehicles.
+advanced|breakthroughs_in_materials_science|Talk about breakthroughs in materials science.
+advanced|the_role_of_social_media_in_shaping_public_opinion|Talk about the role of social media in shaping public opinion.
+advanced|trends_in_fashion_technology_and_wearable_devices|Talk about trends in fashion technology and wearable devices.
+advanced|advancements_in_brain_computer_interfaces|Talk about advancements in brain-computer interfaces.
+advanced|the_psychology_of_decision_making_and_behavioral_economics|Talk about the psychology of decision-making and behavioral economics.
+advanced|global_health_challenges_and_pandemic_preparedness|Talk about global health challenges and pandemic preparedness.
+advanced|evolution_of_social_norms_and_cultural_shifts|Talk about evolution of social norms and cultural shifts.
+advanced|developments_in_the_field_of_astrophysics_and_cosmology|Talk about developments in the field of astrophysics and cosmology.
+advanced|quantum_entanglement_and_its_implications_for_communication|Talk about quantum entanglement and its implications for communication.
+advanced|sustainable_agriculture_practices_and_food_security|Talk about sustainable agriculture practices and food security.
+advanced|innovative_approaches_to_urban_planning_and_smart_cities|Talk about innovative approaches to urban planning and smart cities.
+advanced|exploring_the_possibilities_of_a_cashless_society|Talk about exploring the possibilities of a cashless society.
+advanced|the_role_of_ethics_in_business_and_corporate_responsibility|Talk about the role of ethics in business and corporate responsibility.
+advanced|advancements_in_3d_printing_technology|Talk about advancements in 3d printing technology.
+advanced|the_future_of_work_in_a_digital_age|Talk about the future of work in a digital age.
+advanced|cognitive_biases_and_their_impact_on_decision_making|Talk about cognitive biases and their impact on decision-making.
+advanced|space_tourism_and_its_potential_growth|Talk about space tourism and its potential growth.
+advanced|the_intersection_of_art_and_technology|Talk about the intersection of art and technology.
+advanced|advancements_in_personalized_nutrition|Talk about advancements in personalized nutrition.
+advanced|cultural_preservation_in_the_digital_age|Talk about cultural preservation in the digital age.
+advanced|the_philosophy_of_time_and_the_nature_of_reality|Talk about the philosophy of time and the nature of reality.
+advanced|innovations_in_clean_energy_storage|Talk about innovations in clean energy storage.
+advanced|challenges_and_opportunities_in_the_field_of_nanotechnology|Talk about challenges and opportunities in the field of nanotechnology.
+advanced|the_impact_of_big_data_on_various_industries|Talk about the impact of big data on various industries.
+advanced|the_role_of_mindfulness_and_meditation_in_modern_life|Talk about the role of mindfulness and meditation in modern life.
+advanced|exploring_the_mysteries_of_dark_matter_and_dark_energy|Talk about exploring the mysteries of dark matter and dark energy.
+advanced|the_future_of_entertainment_and_media_consumption|Talk about the future of entertainment and media consumption.
