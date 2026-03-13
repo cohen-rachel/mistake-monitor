@@ -186,7 +186,7 @@ export default function Landing() {
         setStatusMsg(
           result.mistakes.length > 0
             ? `Found ${result.mistakes.length} mistake(s).`
-            : "No mistakes found!"
+            : "No mistakes found. This session will still appear in History and Insights."
         );
         if (selectedTopicKey !== "free_talk") {
           const updated = await getTopicHistory(
@@ -485,7 +485,7 @@ export default function Landing() {
       setUploadStatus(
         session.mistakes.length > 0
           ? `Found ${session.mistakes.length} mistake(s).`
-          : "No mistakes found!"
+          : "No mistakes found. This session will still appear in History and Insights."
       );
     } catch (err: any) {
       setUploadStatus(`Error: ${err.message}`);

@@ -119,7 +119,7 @@ export default function Insights() {
       </h2>
       {data.top_mistakes.length === 0 ? (
         <p style={{ color: "#94a3b8", marginBottom: 24 }}>
-          No mistakes recorded yet. Analyze some sessions to see insights.
+          No mistakes recorded yet. Sessions with zero mistakes still appear in progress and history, but they do not create rewrite exercises.
         </p>
       ) : (
         <div

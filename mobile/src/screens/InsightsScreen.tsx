@@ -115,7 +115,7 @@ export default function InsightsScreen() {
             <Text style={styles.sectionTitle}>Top Mistake Types</Text>
             <VerticalBarChart
               data={topMistakeItems}
-              emptyMessage="No mistakes recorded yet."
+              emptyMessage="No mistakes recorded yet. Sessions with zero mistakes still appear in progress and history."
             />
           </SectionCard>
 

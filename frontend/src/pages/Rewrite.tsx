@@ -216,7 +216,7 @@ export default function Rewrite() {
           </>
         ) : (
           <p style={{ color: "#94a3b8" }}>
-            {noMistakesMessage ?? "No rewrite exercises available yet. Analyze a few sessions first."}
+            {noMistakesMessage ?? "No rewrite exercises available yet. Only sessions with detected mistakes appear here."}
           </p>
         )}
       </div>

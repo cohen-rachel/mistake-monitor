@@ -205,7 +205,7 @@ export default function LandingScreen() {
       setStatusMsg(
         result.mistakes.length > 0
           ? `Found ${result.mistakes.length} mistake(s).`
-          : "No mistakes found."
+          : "No mistakes found. This session will still appear in History and Insights."
       );
     } catch (err: any) {
       setStatusMsg(err?.message || "Transcript analysis failed.");
@@ -237,7 +237,7 @@ export default function LandingScreen() {
       setStatusMsg(
         session.mistakes.length > 0
           ? `Found ${session.mistakes.length} mistake(s).`
-          : "No mistakes found."
+          : "No mistakes found. This session will still appear in History and Insights."
       );
     } catch (err: any) {
       setStatusMsg(err?.message || "Recorded audio upload failed.");
@@ -283,7 +283,7 @@ export default function LandingScreen() {
       setUploadStatus(
         session.mistakes.length > 0
           ? `Found ${session.mistakes.length} mistake(s).`
-          : "No mistakes found."
+          : "No mistakes found. This session will still appear in History and Insights."
       );
     } catch (err: any) {
       setUploadStatus(err?.message || "Upload analysis failed.");

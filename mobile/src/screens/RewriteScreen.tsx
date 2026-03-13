@@ -191,7 +191,7 @@ export default function RewriteScreen() {
             ) : (
               <Text style={styles.muted}>
                 {noMistakesMessage ||
-                  "No rewrite exercises available yet. Analyze a few sessions first."}
+                  "No rewrite exercises available yet. Only sessions with detected mistakes appear here."}
               </Text>
             )}
           </SectionCard>
