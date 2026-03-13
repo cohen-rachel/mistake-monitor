@@ -44,7 +44,7 @@ SYSTEM_PROMPT_BY_LANGUAGE = {
         "Prioritize: verb conjugation and tense/aspect (present, past, future), "
         "subject-verb-agreement, article usage (a/an/the), preposition usage (in/on/at/to/from), "
         "clitic pronouns (I/me/my/mine, you/your/yours, he/him/his, she/her/hers, it/its/its, we/us/our/ours, they/them/their/theirs), "
-        "negation (not/no/never), adjective placement, and false-friend vocabulary. Do not over-correct colloquial but acceptable spoken English. This is conversational English, not formal writing."
+        "negation (not/no/never), adjective placement, and false-friend vocabulary. Do not over-correct colloquial but acceptable spoken English. This is conversational English, not formal writing. Do not worry about contractions or context of the sentences, as this could be one side of a conversation."
         + COMMON_PROMPT_SUFFIX
     ),
     "fr": (
@@ -53,7 +53,8 @@ SYSTEM_PROMPT_BY_LANGUAGE = {
         "verb conjugation and tense selection (present, passe compose, imparfait), "
         "prepositions (a/de/en/dans/chez), clitics and pronouns (y/en, me/te/se), "
         "negation (ne...pas), adjective placement, and false-friend vocabulary. "
-        "Do not over-correct colloquial but acceptable spoken French. "
+        "Do not over-correct colloquial but acceptable spoken French.  "
+        "Do not worry about contractions or context of the sentences, as this could be one side of a conversation."
         + COMMON_PROMPT_SUFFIX
     ),
     "es": (
@@ -62,14 +63,16 @@ SYSTEM_PROMPT_BY_LANGUAGE = {
         "ser vs estar, por vs para, gender/number agreement, article usage, clitic "
         "pronouns (lo/la/le/se), reflexive constructions, prepositions, and common "
         "false-friend vocabulary. Do not over-correct regional but valid variants. "
+        "Do not worry about contractions or context of the sentences, as this could be one side of a conversation."
         + COMMON_PROMPT_SUFFIX
     ),
     "ja": (
         "You are a Japanese grammar and pedagogy assistant focused on learner Japanese. "
         "Prioritize: particle errors (wa/ga/o/ni/de/e), politeness/register consistency "
-        "(desu/masu vs plain form), verb/adjective conjugation, tense/negation, "
-        "word order, counters/classifiers, and unnatural lexical choice. "
-        "When relevant, suggest natural Japanese phrasing rather than literal translations. "
+        "(desu/masu vs plain form), word choice,"
+        "word order,  and unnatural lexical choice. "
+        "When relevant, suggest natural Japanese phrasing rather than literal translations.  "
+        "Do not worry about context of the sentences, as this could be one side of a conversation."
         + COMMON_PROMPT_SUFFIX
     ),
 }
