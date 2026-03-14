@@ -26,8 +26,13 @@ COMMON_PROMPT_SUFFIX = (
     "When given a transcript string, output JSON exactly in the schema specified. "
     "For each suspected error, include type, span text, character indices, suggested "
     "correction, short pedagogical explanation (1-2 sentences), and confidence. "
-    "Be conservative: only flag clear learner mistakes, not stylistic preferences or valid spoken phrasing. "
-    "If a phrase is grammatical and natural in conversation, do not flag it. "
+    "Be highly conservative: only flag clear learner mistakes that genuinely require correction. "
+    "Do not flag stylistic preferences, more formal alternatives, paraphrases, or wording that is merely less polished. "
+    "If a phrase is grammatical and acceptable in spontaneous conversation, do not flag it. "
+    "Do not rewrite utterances to sound more natural, more explicit, more standard, or more native-like unless the original is actually incorrect. "
+    "Do not convert spoken phrasing into a different wording with the same meaning. "
+    "Do not treat discourse markers, fillers, hedges, self-repairs, repetitions, restarts, or sentence fragments as mistakes unless they create a clear grammatical error. "
+    "If the utterance appears incomplete or cut off, assume missing context and do not guess. "
     "If you are not highly confident that something is truly an error, omit it rather than guessing. "
     "Use canonical type codes: verb-tense, preposition, article, word-order, "
     "pronunciation, false-friend, pronoun, pluralization, vocabulary, "
@@ -49,15 +54,14 @@ SYSTEM_PROMPT_BY_LANGUAGE = {
         "clitic pronouns (I/me/my/mine, you/your/yours, he/him/his, she/her/hers, it/its/its, we/us/our/ours, they/them/their/theirs), "
         "negation (not/no/never), adjective placement, and false-friend vocabulary. "
         "This is conversational English, not formal writing. Be strict about avoiding false positives. "
+        "Only flag a construction when it is clearly ungrammatical or clearly the wrong lexical choice for the intended meaning. "
         "Do not over-correct colloquial but acceptable spoken English. "
-        "Do not correct incomplete thoughts, self-interruptions, hedges, fillers, or trailing-off phrasing. "
-        "Do not rewrite for style, tone, or greater formality. "
-        "Only flag clear grammar errors that a careful native speaker would also judge incorrect in conversation. "
-        "Important valid examples that must NOT be flagged: "
-        "'I was just wondering', 'I was wondering if...', 'Would it be possible to maybe...', "
-        "'I was like...', sentence fragments, hesitations, and softened requests. "
-        "In particular, never change first-person singular past 'I was' to 'I were' unless it is a true irrealis/subjunctive construction such as 'If I were you'. "
-        "If a sentence could be acceptable spoken English, DO NOT CORRECT IT."
+        "Do not rewrite for style, tone, register, or greater formality. "
+        "Do not replace valid conversational expressions with more polished alternatives. "
+        "Do not 'improve' fragments, interruptions, trailing-off sentences, hesitations, softened requests, or informal discourse markers. "
+        "Assume the speaker may still be mid-sentence unless the grammar error is already unambiguous. "
+        "If a careful native speaker could plausibly say it in conversation, prefer no correction. "
+        "Your job is error detection, not rewriting."
         + COMMON_PROMPT_SUFFIX
     ),
     "fr": (
@@ -66,10 +70,13 @@ SYSTEM_PROMPT_BY_LANGUAGE = {
         "verb conjugation and tense selection (present, passe compose, imparfait), "
         "prepositions (a/de/en/dans/chez), clitics and pronouns (y/en, me/te/se), "
         "negation (ne...pas), adjective placement, and false-friend vocabulary. "
-        "Do not over-correct colloquial but acceptable spoken French.  "
-        "Do not worry about contractions or context of the sentences, as this could be one side of a conversation."
-        "This is real conversation, so do not over correct, especially for sentences that trail off or are not complete."
-        "Do not correct things that are acceptable in casual conversation, even if they are not correct grammar."
+        "This is conversational French, not formal writing. Be strict about avoiding false positives. "
+        "Do not over-correct colloquial but acceptable spoken French. "
+        "Do not rewrite for style, tone, register, or greater formality. "
+        "Do not replace valid conversational expressions with more polished alternatives. "
+        "Do not 'improve' fragments, interruptions, trailing-off sentences, hesitations, or informal discourse markers. "
+        "Assume the speaker may still be mid-sentence unless the grammar error is already unambiguous. "
+        "If a careful native speaker could plausibly say it in conversation, prefer no correction."
         + COMMON_PROMPT_SUFFIX
     ),
     "es": (
@@ -77,10 +84,13 @@ SYSTEM_PROMPT_BY_LANGUAGE = {
         "Prioritize: verb conjugation and tense/aspect (preterito vs imperfecto), "
         "ser vs estar, por vs para, gender/number agreement, article usage, clitic "
         "pronouns (lo/la/le/se), reflexive constructions, prepositions, and common "
-        "false-friend vocabulary. Do not over-correct regional but valid variants. "
-        "Do not worry about contractions or context of the sentences, as this could be one side of a conversation."
-        "This is real conversation, so do not over correct, especially for sentences that trail off or are not complete."
-        "Do not correct things that are acceptable in casual conversation, even if they are not correct grammar."
+        "false-friend vocabulary. This is conversational Spanish, not formal writing. "
+        "Be strict about avoiding false positives. Do not over-correct regional but valid variants. "
+        "Do not rewrite for style, tone, register, or greater formality. "
+        "Do not replace valid conversational expressions with more polished alternatives. "
+        "Do not 'improve' fragments, interruptions, trailing-off sentences, hesitations, or informal discourse markers. "
+        "Assume the speaker may still be mid-sentence unless the grammar error is already unambiguous. "
+        "If a careful native speaker could plausibly say it in conversation, prefer no correction."
         + COMMON_PROMPT_SUFFIX
     ),
     "ja": (
@@ -88,10 +98,12 @@ SYSTEM_PROMPT_BY_LANGUAGE = {
         "Prioritize: particle errors (wa/ga/o/ni/de/e), politeness/register consistency "
         "(desu/masu vs plain form), word choice,"
         "word order,  and unnatural lexical choice. "
-        "When relevant, suggest natural Japanese phrasing rather than literal translations.  "
-        "Do not worry about context of the sentences, as this could be one side of a conversation."
-        "This is real conversation, so do not over correct, especially for sentences that trail off or are not complete."
-        "Do not correct things that are acceptable in casual conversation, even if they are not correct grammar."
+        "This is conversational Japanese, not formal writing. Be strict about avoiding false positives. "
+        "Do not rewrite for style, tone, register, or greater formality unless the original is actually incorrect. "
+        "Do not replace valid conversational expressions with more polished alternatives. "
+        "Do not 'improve' fragments, interruptions, trailing-off sentences, hesitations, or informal discourse markers. "
+        "Assume the speaker may still be mid-sentence unless the grammar error is already unambiguous. "
+        "If a careful native speaker could plausibly say it in conversation, prefer no correction."
         + COMMON_PROMPT_SUFFIX
     ),
 }
@@ -229,6 +241,20 @@ def _parse_llm_response(raw: str) -> list[LLMMistake]:
     return result.mistakes
 
 
+def _context_window(text: str, start_char: int | None, end_char: int | None, radius: int = 24) -> str:
+    if start_char is None or end_char is None:
+        return text.lower()
+    start = max(0, start_char - radius)
+    end = min(len(text), end_char + radius)
+    return text[start:end].lower()
+
+
+def _is_sentence_fragment(text: str) -> bool:
+    stripped = text.strip()
+    if not stripped:
+        return False
+    return stripped[-1] not in ".!?\"')]}。！？"
+
 async def _resolve_mistake_type(db: AsyncSession, code: str) -> int:
     """Resolve a mistake type code to its ID. Falls back to 'other' if unknown."""
     result = await db.execute(select(MistakeType).where(MistakeType.code == code))
@@ -331,6 +357,14 @@ async def analyze_transcript(
     db_mistakes: list[Mistake] = []
     if not analysis_failed:
         for m in llm_mistakes:
+            if _should_skip_llm_mistake(m, transcript_text, session.language):
+                logger.info(
+                    "Skipping likely false-positive LLM correction: span=%r suggestion=%r explanation=%r",
+                    m.span_text,
+                    m.suggested_correction,
+                    m.explanation,
+                )
+                continue
             type_id = await _resolve_mistake_type(db, m.type)
             mistake = Mistake(
                 session_id=session_id,

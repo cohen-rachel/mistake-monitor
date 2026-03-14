@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     stt_provider: str = "whisper_local"
 
     # LLM provider: ollama | openai | anthropic
-    llm_provider: str = "ollama"
+    llm_provider: str = "openai"
 
     # Ollama settings
     ollama_base_url: str = "http://localhost:11434"
@@ -21,7 +21,7 @@ class Settings(BaseSettings):
 
     # OpenAI settings
     openai_api_key: Optional[str] = None
-    openai_model: str = "gpt-4o-mini"
+    openai_model: str = "gpt-5-mini"
 
     # Anthropic settings
     anthropic_api_key: Optional[str] = None
