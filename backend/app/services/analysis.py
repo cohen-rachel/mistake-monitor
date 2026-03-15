@@ -241,20 +241,6 @@ def _parse_llm_response(raw: str) -> list[LLMMistake]:
     return result.mistakes
 
 
-def _context_window(text: str, start_char: int | None, end_char: int | None, radius: int = 24) -> str:
-    if start_char is None or end_char is None:
-        return text.lower()
-    start = max(0, start_char - radius)
-    end = min(len(text), end_char + radius)
-    return text[start:end].lower()
-
-
-def _is_sentence_fragment(text: str) -> bool:
-    stripped = text.strip()
-    if not stripped:
-        return False
-    return stripped[-1] not in ".!?\"')]}。！？"
-
 async def _resolve_mistake_type(db: AsyncSession, code: str) -> int:
     """Resolve a mistake type code to its ID. Falls back to 'other' if unknown."""
     result = await db.execute(select(MistakeType).where(MistakeType.code == code))
@@ -357,14 +343,6 @@ async def analyze_transcript(
     db_mistakes: list[Mistake] = []
     if not analysis_failed:
         for m in llm_mistakes:
-            if _should_skip_llm_mistake(m, transcript_text, session.language):
-                logger.info(
-                    "Skipping likely false-positive LLM correction: span=%r suggestion=%r explanation=%r",
-                    m.span_text,
-                    m.suggested_correction,
-                    m.explanation,
-                )
-                continue
             type_id = await _resolve_mistake_type(db, m.type)
             mistake = Mistake(
                 session_id=session_id,
