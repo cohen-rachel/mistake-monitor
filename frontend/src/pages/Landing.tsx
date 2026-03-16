@@ -124,6 +124,8 @@ export default function Landing() {
   } = useLandingState();
   const [autoAnalyzing, setAutoAnalyzing] = useState(false);
   const [autoQueueVersion, setAutoQueueVersion] = useState(0);
+  const [pendingOverrideSessionId, setPendingOverrideSessionId] = useState<number | null>(null);
+  const [pendingOverrideScope, setPendingOverrideScope] = useState<"record" | "upload" | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const liveTranscriptRef = useRef(liveTranscript);
@@ -142,6 +144,20 @@ export default function Landing() {
   useEffect(() => {
     liveTranscriptRef.current = liveTranscript;
   }, [liveTranscript]);
+
+  useEffect(() => {
+    setPendingOverrideSessionId(null);
+    setPendingOverrideScope(null);
+    if (isLanguageMismatchMessage(statusMsg)) {
+      setStatusMsg("");
+    }
+    if (isLanguageMismatchMessage(uploadStatus)) {
+      setUploadStatus("");
+    }
+  }, [currentLanguageProfile?.id]);
+
+  const isLanguageMismatchMessage = (message?: string) =>
+    !!message && /language mismatch/i.test(message);
 
   const buildPracticeSelection = useCallback((): PracticeSelection => {
     if (selectedTopicKey === "free_talk" || !selectedTopic) {
@@ -169,6 +185,7 @@ export default function Landing() {
       if (isAuto && (autoAnalyzing || analyzing)) {
         return null;
       }
+      let createdSessionId: number | null = null;
       const setLoading = isAuto ? setAutoAnalyzing : setAnalyzing;
       setLoading(true);
       try {
@@ -178,11 +195,14 @@ export default function Landing() {
           currentLanguageProfile.id,
           buildPracticeSelection()
         );
+        createdSessionId = session.id;
         if (!isAuto) {
           setStatusMsg("Analyzing...");
         }
         const result = await analyzeSession(session.id);
         setMistakes((prev) => (isAuto ? [...prev, ...result.mistakes] : result.mistakes));
+        setPendingOverrideSessionId(null);
+        setPendingOverrideScope(null);
         setStatusMsg(
           result.mistakes.length > 0
             ? `Found ${result.mistakes.length} mistake(s).`
@@ -200,6 +220,14 @@ export default function Landing() {
         }
         return result;
       } catch (err: any) {
+        if (!isAuto && isLanguageMismatchMessage(err?.message)) {
+          setPendingOverrideSessionId(createdSessionId);
+          setPendingOverrideScope("record");
+          setStatusMsg(
+            "Language mismatch detected. Switch profiles and keep your transcript, or click Analyze Anyway to continue with this profile."
+          );
+          return null;
+        }
         setStatusMsg(`Error: ${err?.message || "analysis failed"}`);
         throw err;
       } finally {
@@ -439,7 +467,10 @@ export default function Landing() {
     }
 
     try {
-      await analyzeTranscript(fullText);
+      const result = await analyzeTranscript(fullText);
+      if (!result) {
+        return;
+      }
     } catch {
       // Status text is already set inside analyzeTranscript.
     }
@@ -464,6 +495,8 @@ export default function Landing() {
     setStatusMsg("");
     setElapsedSec(0);
     setAutoAnalyzing(false);
+    setPendingOverrideSessionId(null);
+    setPendingOverrideScope(null);
   };
 
   const handleUploadAnalyze = async () => {
@@ -482,14 +515,66 @@ export default function Landing() {
       );
       setUploadTranscript(session.transcript?.raw_text || "");
       setUploadMistakes(session.mistakes || []);
-      setUploadStatus(
-        session.mistakes.length > 0
-          ? `Found ${session.mistakes.length} mistake(s).`
-          : "No mistakes found. This session will still appear in History and Insights."
-      );
+      if (session.status === "error" && session.transcript?.raw_text) {
+        setPendingOverrideSessionId(session.id);
+        setPendingOverrideScope("upload");
+        setUploadStatus(
+          "Language mismatch detected. Switch profiles and re-run, or click Analyze Anyway to continue with this profile."
+        );
+      } else {
+        setPendingOverrideSessionId(null);
+        setPendingOverrideScope(null);
+        setUploadStatus(
+          session.mistakes.length > 0
+            ? `Found ${session.mistakes.length} mistake(s).`
+            : "No mistakes found. This session will still appear in History and Insights."
+        );
+      }
     } catch (err: any) {
       setUploadStatus(`Error: ${err.message}`);
     } finally {
+      setUploadAnalyzing(false);
+    }
+  };
+
+  const handleOverrideAnalyze = async () => {
+    if (!pendingOverrideSessionId) return;
+    const isUpload = pendingOverrideScope === "upload";
+    if (isUpload) {
+      setUploadAnalyzing(true);
+      setUploadStatus("Analyzing anyway...");
+    } else {
+      setAnalyzing(true);
+      setStatusMsg("Analyzing anyway...");
+    }
+    try {
+      const result = await analyzeSession(pendingOverrideSessionId, undefined, true);
+      setPendingOverrideSessionId(null);
+      setPendingOverrideScope(null);
+      if (isUpload) {
+        setUploadMistakes(result.mistakes);
+        setUploadStatus(
+          result.mistakes.length > 0
+            ? `Found ${result.mistakes.length} mistake(s).`
+            : "No mistakes found. This session will still appear in History and Insights."
+        );
+      } else {
+        setMistakes(result.mistakes);
+        setTranscriptAnalyzed(true);
+        setStatusMsg(
+          result.mistakes.length > 0
+            ? `Found ${result.mistakes.length} mistake(s).`
+            : "No mistakes found. This session will still appear in History and Insights."
+        );
+      }
+    } catch (err: any) {
+      if (isUpload) {
+        setUploadStatus(`Error: ${err.message || "override failed"}`);
+      } else {
+        setStatusMsg(`Error: ${err.message || "override failed"}`);
+      }
+    } finally {
+      setAnalyzing(false);
       setUploadAnalyzing(false);
     }
   };
@@ -648,6 +733,11 @@ export default function Landing() {
                 setAutoQueueVersion((prev) => prev + 1);
                 setLiveTranscript(value);
                 setTranscriptAnalyzed(false);
+                setPendingOverrideSessionId(null);
+                setPendingOverrideScope(null);
+                if (isLanguageMismatchMessage(statusMsg)) {
+                  setStatusMsg("");
+                }
               }}
             />
 
@@ -655,6 +745,17 @@ export default function Landing() {
               <p style={{ marginTop: 12, fontSize: 14, color: "#475569" }}>
                 {statusMsg}
               </p>
+            )}
+            {pendingOverrideSessionId && pendingOverrideScope === "record" && (
+              <div style={{ marginTop: 12 }}>
+                <button
+                  onClick={handleOverrideAnalyze}
+                  disabled={analyzing || autoAnalyzing}
+                  style={analyzing || autoAnalyzing ? btnDisabled : { ...btnPrimary, background: "#0f766e" }}
+                >
+                  Analyze Anyway
+                </button>
+              </div>
             )}
           </div>
 
@@ -719,6 +820,17 @@ export default function Landing() {
               <p style={{ marginTop: 12, fontSize: 14, color: "#475569" }}>
                 {uploadStatus}
               </p>
+            )}
+            {pendingOverrideSessionId && pendingOverrideScope === "upload" && (
+              <div style={{ marginTop: 12 }}>
+                <button
+                  onClick={handleOverrideAnalyze}
+                  disabled={uploadAnalyzing}
+                  style={uploadAnalyzing ? btnDisabled : { ...btnPrimary, background: "#0f766e" }}
+                >
+                  Analyze Anyway
+                </button>
+              </div>
             )}
           </div>
 

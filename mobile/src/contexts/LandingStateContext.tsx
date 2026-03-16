@@ -42,6 +42,8 @@ interface LandingStateContextType {
   setUploadStatus: React.Dispatch<React.SetStateAction<string>>;
   recordedFile: MobileAudioFile | null;
   setRecordedFile: React.Dispatch<React.SetStateAction<MobileAudioFile | null>>;
+  dataRefreshVersion: number;
+  bumpDataRefreshVersion: () => void;
 }
 
 const LandingStateContext = createContext<LandingStateContextType | undefined>(
@@ -68,6 +70,7 @@ export function LandingStateProvider({ children }: { children: ReactNode }) {
   const [uploadTranscript, setUploadTranscript] = useState("");
   const [uploadStatus, setUploadStatus] = useState("");
   const [recordedFile, setRecordedFile] = useState<MobileAudioFile | null>(null);
+  const [dataRefreshVersion, setDataRefreshVersion] = useState(0);
 
   return (
     <LandingStateContext.Provider
@@ -110,6 +113,9 @@ export function LandingStateProvider({ children }: { children: ReactNode }) {
         setUploadStatus,
         recordedFile,
         setRecordedFile,
+        dataRefreshVersion,
+        bumpDataRefreshVersion: () =>
+          setDataRefreshVersion((prev) => prev + 1),
       }}
     >
       {children}

@@ -9,6 +9,7 @@ import {
   submitRewriteExercise,
 } from "../services/api";
 import { useLanguageContext } from "../contexts/LanguageContext";
+import { useLandingState } from "../contexts/LandingStateContext";
 import type {
   RewriteExerciseResponse,
   RewriteStatsResponse,
@@ -17,6 +18,7 @@ import { colors } from "../theme";
 
 export default function RewriteScreen() {
   const { currentLanguageProfile, isLoadingLanguage } = useLanguageContext();
+  const { dataRefreshVersion } = useLandingState();
   const [exercise, setExercise] = useState<RewriteExerciseResponse | null>(null);
   const [stats, setStats] = useState<RewriteStatsResponse | null>(null);
   const [answer, setAnswer] = useState("");
@@ -86,7 +88,7 @@ export default function RewriteScreen() {
     }
     void loadExercise();
     void loadStats();
-  }, [currentLanguageProfile]);
+  }, [currentLanguageProfile, dataRefreshVersion]);
 
   const handleSubmit = async () => {
     if (!exercise || !answer.trim() || !currentLanguageProfile) {

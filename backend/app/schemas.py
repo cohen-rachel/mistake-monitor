@@ -101,6 +101,7 @@ class SessionListOut(BaseModel):
 class AnalyzeRequest(BaseModel):
     session_id: int
     transcript_text: Optional[str] = None  # override transcript if needed
+    allow_language_mismatch: bool = False
 
 
 class LLMMistake(BaseModel):

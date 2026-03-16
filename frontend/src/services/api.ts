@@ -107,7 +107,8 @@ export async function getSession(id: number): Promise<SessionDetailOut> {
 
 export async function analyzeSession(
   sessionId: number,
-  transcriptText?: string
+  transcriptText?: string,
+  allowLanguageMismatch: boolean = false
 ): Promise<AnalyzeResponse> {
   return request<AnalyzeResponse>("/analyze", {
     method: "POST",
@@ -115,6 +116,7 @@ export async function analyzeSession(
     body: JSON.stringify({
       session_id: sessionId,
       transcript_text: transcriptText,
+      allow_language_mismatch: allowLanguageMismatch,
     }),
   });
 }

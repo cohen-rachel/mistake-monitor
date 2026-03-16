@@ -7,11 +7,13 @@ import PieChart from "../components/PieChart";
 import TimeSeriesChart from "../components/TimeSeriesChart";
 import { getInsights } from "../services/api";
 import { useLanguageContext } from "../contexts/LanguageContext";
+import { useLandingState } from "../contexts/LandingStateContext";
 import type { InsightsResponse } from "../types";
 import { colors } from "../theme";
 
 export default function InsightsScreen() {
   const { currentLanguageProfile, isLoadingLanguage } = useLanguageContext();
+  const { dataRefreshVersion } = useLandingState();
   const [data, setData] = useState<InsightsResponse | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -27,7 +29,7 @@ export default function InsightsScreen() {
       .then(setData)
       .catch(() => setData(null))
       .finally(() => setLoading(false));
-  }, [currentLanguageProfile, isLoadingLanguage]);
+  }, [currentLanguageProfile, isLoadingLanguage, dataRefreshVersion]);
 
   const topMistakeItems = useMemo(
     () =>
@@ -153,7 +155,7 @@ export default function InsightsScreen() {
                 <View key={item.id} style={styles.recentRow}>
                   <Text style={styles.recentLabel}>{item.mistake_type_label}</Text>
                   <Text style={styles.recentText}>
-                    {item.transcript_span || "(unknown)"} ->{" "}
+                    {item.transcript_span || "(unknown)"} {"->"}{" "}
                     {item.suggested_correction || "(no suggestion)"}
                   </Text>
                   {item.explanation_short ? (

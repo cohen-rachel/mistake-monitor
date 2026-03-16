@@ -4,12 +4,14 @@ import Screen from "../components/Screen";
 import SectionCard from "../components/SectionCard";
 import MistakeCard from "../components/MistakeCard";
 import { useLanguageContext } from "../contexts/LanguageContext";
+import { useLandingState } from "../contexts/LandingStateContext";
 import { getSession, listSessions } from "../services/api";
 import type { SessionDetailOut, SessionOut } from "../types";
 import { colors } from "../theme";
 
 export default function HistoryScreen() {
   const { currentLanguageProfile, isLoadingLanguage } = useLanguageContext();
+  const { dataRefreshVersion } = useLandingState();
   const [sessions, setSessions] = useState<SessionOut[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<number | null>(null);
@@ -28,7 +30,7 @@ export default function HistoryScreen() {
       .then((data) => setSessions(data.sessions))
       .catch(() => setSessions([]))
       .finally(() => setLoading(false));
-  }, [currentLanguageProfile, isLoadingLanguage]);
+  }, [currentLanguageProfile, isLoadingLanguage, dataRefreshVersion]);
 
   const handleExpand = async (id: number) => {
     if (expandedId === id) {

@@ -14,10 +14,11 @@ import {
   analyzeSession,
   createSessionWithAudio,
   createSessionWithTranscript,
+  getSession,
   getTopicHistory,
   getTopics,
 } from "../services/api";
-import type { PracticeSelection } from "../types";
+import type { PracticeSelection, SessionDetailOut } from "../types";
 import { colors } from "../theme";
 
 function formatDuration(totalSeconds: number): string {
@@ -69,7 +70,10 @@ export default function LandingScreen() {
     setUploadStatus,
     recordedFile,
     setRecordedFile,
+    bumpDataRefreshVersion,
   } = useLandingState();
+  const [pendingOverrideSessionId, setPendingOverrideSessionId] = React.useState<number | null>(null);
+  const [pendingOverrideScope, setPendingOverrideScope] = React.useState<"record" | "upload" | null>(null);
 
   const selectedTopic = useMemo(
     () => topics.find((topic) => topic.key === selectedTopicKey) ?? null,
@@ -181,48 +185,100 @@ export default function LandingScreen() {
     };
   }, [estimatedLevel, selectedTopic, selectedTopicKey]);
 
+  const isLanguageMismatchMessage = (message?: string) =>
+    !!message && /language mismatch/i.test(message);
+
+  const applyRecordSessionResult = (session: SessionDetailOut) => {
+    const transcript = session.transcript?.raw_text || liveTranscript.trim();
+    setLiveTranscript(transcript);
+    setMistakes(session.mistakes || []);
+    setTranscriptAnalyzed(true);
+    if (session.status === "error" && transcript) {
+      setPendingOverrideSessionId(session.id);
+      setPendingOverrideScope("record");
+      setStatusMsg(
+        "Language mismatch detected. Switch profiles and keep your transcript, or tap Analyze Anyway to continue with this profile."
+      );
+      return;
+    }
+    setPendingOverrideSessionId(null);
+    setPendingOverrideScope(null);
+    setStatusMsg(
+      session.mistakes.length > 0
+        ? `Found ${session.mistakes.length} mistake(s).`
+        : "No mistakes found. This session will still appear in History and Insights."
+    );
+  };
+
+  const applyUploadSessionResult = (session: SessionDetailOut) => {
+    const transcript = session.transcript?.raw_text || "";
+    setUploadTranscript(transcript);
+    setUploadMistakes(session.mistakes || []);
+    if (session.status === "error" && transcript) {
+      setPendingOverrideSessionId(session.id);
+      setPendingOverrideScope("upload");
+      setUploadStatus(
+        "Language mismatch detected. Switch profiles and re-run, or tap Analyze Anyway to continue with this profile."
+      );
+      return;
+    }
+    setPendingOverrideSessionId(null);
+    setPendingOverrideScope(null);
+    setUploadStatus(
+      session.mistakes.length > 0
+        ? `Found ${session.mistakes.length} mistake(s).`
+        : "No mistakes found. This session will still appear in History and Insights."
+    );
+  };
+
   const handleAnalyzeRecordedAudio = async () => {
     if (!currentLanguageProfile) {
       setStatusMsg("Select a language profile first.");
       return;
     }
-    if (!recordedFile && !liveTranscript.trim()) {
+    const trimmedTranscript = liveTranscript.trim();
+    const shouldAnalyzeTypedTranscript = trimmedTranscript.length > 0;
+    if (!recordedFile && !shouldAnalyzeTypedTranscript) {
       setStatusMsg("Record audio first, or type transcript text before analyzing.");
       return;
     }
     setAnalyzing(true);
     try {
-      if (recordedFile) {
+      if (!shouldAnalyzeTypedTranscript && recordedFile) {
         setStatusMsg("Uploading recorded audio...");
         const session = await createSessionWithAudio(
           recordedFile,
           currentLanguageProfile.id,
           buildPracticeSelection()
         );
-        setLiveTranscript(session.transcript?.raw_text || "");
-        setMistakes(session.mistakes || []);
-        setTranscriptAnalyzed(true);
-        setStatusMsg(
-          session.mistakes.length > 0
-            ? `Found ${session.mistakes.length} mistake(s).`
-            : "No mistakes found. This session will still appear in History and Insights."
-        );
+        const detail = await getSession(session.id);
+        applyRecordSessionResult(detail);
+        bumpDataRefreshVersion();
       } else {
         setStatusMsg("Saving session...");
         const session = await createSessionWithTranscript(
-          liveTranscript.trim(),
+          trimmedTranscript,
           currentLanguageProfile.id,
           buildPracticeSelection()
         );
         setStatusMsg("Analyzing...");
-        const result = await analyzeSession(session.id);
-        setMistakes(result.mistakes);
-        setTranscriptAnalyzed(true);
-        setStatusMsg(
-          result.mistakes.length > 0
-            ? `Found ${result.mistakes.length} mistake(s).`
-            : "No mistakes found. This session will still appear in History and Insights."
-        );
+        try {
+          await analyzeSession(session.id);
+          const detail = await getSession(session.id);
+          applyRecordSessionResult(detail);
+          bumpDataRefreshVersion();
+        } catch (err: any) {
+          if (isLanguageMismatchMessage(err?.message)) {
+            setPendingOverrideSessionId(session.id);
+            setPendingOverrideScope("record");
+            setTranscriptAnalyzed(false);
+            setStatusMsg(
+              "Language mismatch detected. Switch profiles and keep your transcript, or tap Analyze Anyway to continue with this profile."
+            );
+          } else {
+            throw err;
+          }
+        }
       }
     } catch (err: any) {
       setStatusMsg(err?.message || "Analysis failed.");
@@ -263,13 +319,9 @@ export default function LandingScreen() {
         currentLanguageProfile.id,
         buildPracticeSelection()
       );
-      setUploadTranscript(session.transcript?.raw_text || "");
-      setUploadMistakes(session.mistakes || []);
-      setUploadStatus(
-        session.mistakes.length > 0
-          ? `Found ${session.mistakes.length} mistake(s).`
-          : "No mistakes found. This session will still appear in History and Insights."
-      );
+      const detail = await getSession(session.id);
+      applyUploadSessionResult(detail);
+      bumpDataRefreshVersion();
     } catch (err: any) {
       setUploadStatus(err?.message || "Upload analysis failed.");
     } finally {
@@ -284,6 +336,51 @@ export default function LandingScreen() {
     setStatusMsg("");
     setElapsedSec(0);
     setRecordedFile(null);
+    setPendingOverrideSessionId(null);
+    setPendingOverrideScope(null);
+  };
+
+  useEffect(() => {
+    setPendingOverrideSessionId(null);
+    setPendingOverrideScope(null);
+    if (isLanguageMismatchMessage(statusMsg)) {
+      setStatusMsg("");
+    }
+    if (isLanguageMismatchMessage(uploadStatus)) {
+      setUploadStatus("");
+    }
+  }, [currentLanguageProfile?.id]);
+
+  const handleOverrideAnalyze = async () => {
+    if (!pendingOverrideSessionId) {
+      return;
+    }
+    if (pendingOverrideScope === "upload") {
+      setUploadAnalyzing(true);
+      setUploadStatus("Analyzing anyway...");
+    } else {
+      setAnalyzing(true);
+      setStatusMsg("Analyzing anyway...");
+    }
+    try {
+      await analyzeSession(pendingOverrideSessionId, undefined, true);
+      const detail = await getSession(pendingOverrideSessionId);
+      if (pendingOverrideScope === "upload") {
+        applyUploadSessionResult(detail);
+      } else {
+        applyRecordSessionResult(detail);
+      }
+      bumpDataRefreshVersion();
+    } catch (err: any) {
+      if (pendingOverrideScope === "upload") {
+        setUploadStatus(err?.message || "Override analysis failed.");
+      } else {
+        setStatusMsg(err?.message || "Override analysis failed.");
+      }
+    } finally {
+      setAnalyzing(false);
+      setUploadAnalyzing(false);
+    }
   };
 
   const handleRandomizeTopic = () => {
@@ -444,10 +541,28 @@ export default function LandingScreen() {
               onChangeText={(value) => {
                 setLiveTranscript(value);
                 setTranscriptAnalyzed(false);
+                setPendingOverrideSessionId(null);
+                setPendingOverrideScope(null);
+                if (isLanguageMismatchMessage(statusMsg)) {
+                  setStatusMsg("");
+                }
+                if (value.trim()) {
+                  setRecordedFile(null);
+                }
               }}
             />
 
             {statusMsg ? <Text style={styles.status}>{statusMsg}</Text> : null}
+            {pendingOverrideSessionId && pendingOverrideScope === "record" ? (
+              <PrimaryButton
+                label="Analyze Anyway"
+                onPress={() => {
+                  void handleOverrideAnalyze();
+                }}
+                disabled={analyzing || isRecording}
+                tone="neutral"
+              />
+            ) : null}
           </SectionCard>
 
           {transcriptAnalyzed && liveTranscript ? (
@@ -491,6 +606,16 @@ export default function LandingScreen() {
               tone="success"
             />
             {uploadStatus ? <Text style={styles.status}>{uploadStatus}</Text> : null}
+            {pendingOverrideSessionId && pendingOverrideScope === "upload" ? (
+              <PrimaryButton
+                label="Analyze Anyway"
+                onPress={() => {
+                  void handleOverrideAnalyze();
+                }}
+                disabled={uploadAnalyzing}
+                tone="neutral"
+              />
+            ) : null}
           </SectionCard>
 
           {uploadTranscript ? (

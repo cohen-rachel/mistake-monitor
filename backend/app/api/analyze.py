@@ -18,6 +18,7 @@ async def analyze(req: AnalyzeRequest, db: AsyncSession = Depends(get_db)):
             db,
             session_id=req.session_id,
             transcript_text=req.transcript_text,
+            allow_language_mismatch=req.allow_language_mismatch,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

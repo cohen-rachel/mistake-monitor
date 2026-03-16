@@ -139,6 +139,7 @@ def _build_user_prompt(
     transcript: str,
     language: str,
     prior_summary: Optional[list[dict]] = None,
+    allow_language_mismatch: bool = False,
 ) -> str:
     """Build the user prompt with transcript and optional prior mistake summary."""
     parts = [
@@ -150,6 +151,11 @@ def _build_user_prompt(
             f"{item['code']} ({item['count']})" for item in prior_summary[:10]
         )
         parts.append(f"\nPrior mistake summary (top types with counts): {summary_text}")
+    if allow_language_mismatch:
+        parts.append(
+            "\nThe user explicitly chose to continue even if the transcript may not match the selected language profile. "
+            "Do not refuse due to language mismatch. Analyze the transcript against the selected target language as best you can."
+        )
     return "\n".join(parts)
 
 
@@ -262,6 +268,7 @@ async def analyze_transcript(
     db: AsyncSession,
     session_id: int,
     transcript_text: Optional[str] = None,
+    allow_language_mismatch: bool = False,
 ) -> list[Mistake]:
     """Run LLM analysis on a transcript and store mistakes in the DB."""
     session_result = await db.execute(select(Session).where(Session.id == session_id))
@@ -289,7 +296,7 @@ async def analyze_transcript(
     detected_language_info = _detect_transcript_language(transcript_text)
     if detected_language_info:
         detected_language, confidence = detected_language_info
-        if detected_language != session.language:
+        if detected_language != session.language and not allow_language_mismatch:
             logger.warning(
                 "Detected transcript language %s (confidence %.2f) != session target %s; short-circuiting analysis.",
                 detected_language,
@@ -309,7 +316,12 @@ async def analyze_transcript(
     )
 
     # Build prompts and call LLM
-    user_prompt = _build_user_prompt(transcript_text, session.language, prior_summary)
+    user_prompt = _build_user_prompt(
+        transcript_text,
+        session.language,
+        prior_summary,
+        allow_language_mismatch=allow_language_mismatch,
+    )
     system_prompt = SYSTEM_PROMPT_BY_LANGUAGE.get(session.language, DEFAULT_SYSTEM_PROMPT)
     llm = get_llm_provider()
     logger.info(f"LLM System Prompt (Language: {session.language}): \"\"\"{system_prompt}\"\"\"")
@@ -326,14 +338,35 @@ async def analyze_transcript(
         logger.info(f"LLM Raw Response: {raw_response[:500]}...")
         llm_mistakes = _parse_llm_response(raw_response)
     except LanguageMismatchError as mismatch_error:
-        analysis_failed = True
-        language_mismatch_error = mismatch_error
-        logger.warning(
-            "LLM reported language mismatch (transcript=%s target=%s); raw response snippet: %s",
-            mismatch_error.transcript_language,
-            mismatch_error.target_language,
-            raw_response[:500],
-        )
+        if allow_language_mismatch:
+            logger.warning(
+                "LLM reported language mismatch despite override; retrying once with stronger instruction."
+            )
+            retry_user_prompt = (
+                f"{user_prompt}\n\nOverride reminder: the user explicitly chose to proceed. "
+                "You must return JSON analysis for the selected target language and must not reply with a language mismatch refusal."
+            )
+            try:
+                raw_response = await llm.complete(system_prompt, retry_user_prompt)
+                logger.info(f"LLM Raw Response (override retry): {raw_response[:500]}...")
+                llm_mistakes = _parse_llm_response(raw_response)
+            except LanguageMismatchError as retry_mismatch_error:
+                analysis_failed = True
+                language_mismatch_error = retry_mismatch_error
+                logger.warning(
+                    "LLM still reported language mismatch after override retry (transcript=%s target=%s).",
+                    retry_mismatch_error.transcript_language,
+                    retry_mismatch_error.target_language,
+                )
+        else:
+            analysis_failed = True
+            language_mismatch_error = mismatch_error
+            logger.warning(
+                "LLM reported language mismatch (transcript=%s target=%s); raw response snippet: %s",
+                mismatch_error.transcript_language,
+                mismatch_error.target_language,
+                raw_response[:500],
+            )
     except Exception as exc:
         analysis_failed = True
         analysis_exception = exc
