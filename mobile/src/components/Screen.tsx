@@ -1,11 +1,9 @@
 import React, { forwardRef, ReactNode } from "react";
 import {
-  Keyboard,
   KeyboardAvoidingView,
   NativeSyntheticEvent,
   NativeScrollEvent,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   View,
@@ -28,21 +26,19 @@ const Screen = forwardRef<
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       keyboardVerticalOffset={Platform.OS === "ios" ? 12 : 0}
     >
-      <Pressable style={styles.keyboardArea} onPress={Keyboard.dismiss}>
-        <ScrollView
-          ref={ref}
-          style={styles.scroll}
-          contentContainerStyle={styles.content}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="always"
-          keyboardDismissMode="none"
-          automaticallyAdjustKeyboardInsets
-          onScroll={onScroll}
-          scrollEventThrottle={16}
-        >
-          <View>{children}</View>
-        </ScrollView>
-      </Pressable>
+      <ScrollView
+        ref={ref}
+        style={styles.scroll}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="none"
+        automaticallyAdjustKeyboardInsets
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+      >
+        <View>{children}</View>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 });

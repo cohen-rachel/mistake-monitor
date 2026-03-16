@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { memo, useEffect, useState } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import Screen from "../components/Screen";
 import SectionCard from "../components/SectionCard";
@@ -9,7 +9,7 @@ import { getSession, listSessions } from "../services/api";
 import type { SessionDetailOut, SessionOut } from "../types";
 import { colors } from "../theme";
 
-export default function HistoryScreen() {
+function HistoryScreen() {
   const { currentLanguageProfile, isLoadingLanguage } = useLanguageContext();
   const { dataRefreshVersion } = useLandingState();
   const [sessions, setSessions] = useState<SessionOut[]>([]);
@@ -133,6 +133,8 @@ export default function HistoryScreen() {
     </Screen>
   );
 }
+
+export default memo(HistoryScreen);
 
 const styles = StyleSheet.create({
   title: {

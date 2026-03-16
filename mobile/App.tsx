@@ -12,7 +12,7 @@ import LandingScreen from "./src/screens/LandingScreen";
 import HistoryScreen from "./src/screens/HistoryScreen";
 import InsightsScreen from "./src/screens/InsightsScreen";
 import RewriteScreen from "./src/screens/RewriteScreen";
-import { LanguageProvider, useLanguageContext } from "./src/contexts/LanguageContext";
+import { LanguageProvider } from "./src/contexts/LanguageContext";
 import { LandingStateProvider } from "./src/contexts/LandingStateContext";
 import LanguagePicker from "./src/components/LanguagePicker";
 import { colors, layout } from "./src/theme";
@@ -77,25 +77,23 @@ function AppShell() {
           })}
         </View>
       </View>
-      <LandingStateProvider>
-        <View style={styles.screenContainer}>
-          {tabs.map((tab) => {
-            if (!visited[tab.key]) {
-              return null;
-            }
-            const active = tab.key === screen;
-            return (
-              <View
-                key={tab.key}
-                style={[styles.screenPane, !active && styles.screenPaneHidden]}
-                pointerEvents={active ? "auto" : "none"}
-              >
-                {renderedScreens[tab.key]}
-              </View>
-            );
-          })}
-        </View>
-      </LandingStateProvider>
+      <View style={styles.screenContainer}>
+        {tabs.map((tab) => {
+          if (!visited[tab.key]) {
+            return null;
+          }
+          const active = tab.key === screen;
+          return (
+            <View
+              key={tab.key}
+              style={[styles.screenPane, !active && styles.screenPaneHidden]}
+              pointerEvents={active ? "auto" : "none"}
+            >
+              {renderedScreens[tab.key]}
+            </View>
+          );
+        })}
+      </View>
     </SafeAreaView>
   );
 }
@@ -103,7 +101,9 @@ function AppShell() {
 export default function App() {
   return (
     <LanguageProvider>
-      <AppShell />
+      <LandingStateProvider>
+        <AppShell />
+      </LandingStateProvider>
     </LanguageProvider>
   );
 }

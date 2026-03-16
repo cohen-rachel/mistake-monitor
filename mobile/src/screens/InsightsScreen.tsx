@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { memo, useEffect, useMemo, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import Screen from "../components/Screen";
 import SectionCard from "../components/SectionCard";
@@ -11,7 +11,7 @@ import { useLandingState } from "../contexts/LandingStateContext";
 import type { InsightsResponse } from "../types";
 import { colors } from "../theme";
 
-export default function InsightsScreen() {
+function InsightsScreen() {
   const { currentLanguageProfile, isLoadingLanguage } = useLanguageContext();
   const { dataRefreshVersion } = useLandingState();
   const [data, setData] = useState<InsightsResponse | null>(null);
@@ -170,6 +170,8 @@ export default function InsightsScreen() {
     </Screen>
   );
 }
+
+export default memo(InsightsScreen);
 
 const styles = StyleSheet.create({
   title: {

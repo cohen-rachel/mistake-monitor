@@ -1,4 +1,4 @@
-import React, { createContext, ReactNode, useContext, useState } from "react";
+import React, { createContext, ReactNode, useContext, useMemo, useState } from "react";
 import type { MistakeOut, MobileAudioFile, TopicAttemptItem, TopicItem } from "../types";
 
 type LandingTab = "record" | "upload";
@@ -71,53 +71,76 @@ export function LandingStateProvider({ children }: { children: ReactNode }) {
   const [uploadStatus, setUploadStatus] = useState("");
   const [recordedFile, setRecordedFile] = useState<MobileAudioFile | null>(null);
   const [dataRefreshVersion, setDataRefreshVersion] = useState(0);
+  const value = useMemo(
+    () => ({
+      tab,
+      setTab,
+      topics,
+      setTopics,
+      estimatedLevel,
+      setEstimatedLevel,
+      selectedTopicKey,
+      setSelectedTopicKey,
+      topicHistory,
+      setTopicHistory,
+      topicsLoading,
+      setTopicsLoading,
+      isRecording,
+      setIsRecording,
+      elapsedSec,
+      setElapsedSec,
+      liveTranscript,
+      setLiveTranscript,
+      transcriptAnalyzed,
+      setTranscriptAnalyzed,
+      analyzing,
+      setAnalyzing,
+      mistakes,
+      setMistakes,
+      statusMsg,
+      setStatusMsg,
+      uploadFile,
+      setUploadFile,
+      uploadAnalyzing,
+      setUploadAnalyzing,
+      uploadMistakes,
+      setUploadMistakes,
+      uploadTranscript,
+      setUploadTranscript,
+      uploadStatus,
+      setUploadStatus,
+      recordedFile,
+      setRecordedFile,
+      dataRefreshVersion,
+      bumpDataRefreshVersion: () =>
+        setDataRefreshVersion((prev) => prev + 1),
+    }),
+    [
+      tab,
+      topics,
+      estimatedLevel,
+      selectedTopicKey,
+      topicHistory,
+      topicsLoading,
+      isRecording,
+      elapsedSec,
+      liveTranscript,
+      transcriptAnalyzed,
+      analyzing,
+      mistakes,
+      statusMsg,
+      uploadFile,
+      uploadAnalyzing,
+      uploadMistakes,
+      uploadTranscript,
+      uploadStatus,
+      recordedFile,
+      dataRefreshVersion,
+    ]
+  );
 
   return (
-    <LandingStateContext.Provider
-      value={{
-        tab,
-        setTab,
-        topics,
-        setTopics,
-        estimatedLevel,
-        setEstimatedLevel,
-        selectedTopicKey,
-        setSelectedTopicKey,
-        topicHistory,
-        setTopicHistory,
-        topicsLoading,
-        setTopicsLoading,
-        isRecording,
-        setIsRecording,
-        elapsedSec,
-        setElapsedSec,
-        liveTranscript,
-        setLiveTranscript,
-        transcriptAnalyzed,
-        setTranscriptAnalyzed,
-        analyzing,
-        setAnalyzing,
-        mistakes,
-        setMistakes,
-        statusMsg,
-        setStatusMsg,
-        uploadFile,
-        setUploadFile,
-        uploadAnalyzing,
-        setUploadAnalyzing,
-        uploadMistakes,
-        setUploadMistakes,
-        uploadTranscript,
-        setUploadTranscript,
-        uploadStatus,
-        setUploadStatus,
-        recordedFile,
-        setRecordedFile,
-        dataRefreshVersion,
-        bumpDataRefreshVersion: () =>
-          setDataRefreshVersion((prev) => prev + 1),
-      }}
-    >
+    <LandingStateContext.Provider value={value}>
       {children}
     </LandingStateContext.Provider>
   );

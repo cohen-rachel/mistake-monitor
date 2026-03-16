@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef } from "react";
+import React, { memo, useCallback, useEffect, useMemo, useRef } from "react";
 import { ScrollView, Text, StyleSheet, TouchableOpacity, View } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
 import Screen from "../components/Screen";
@@ -29,7 +29,7 @@ function formatDuration(totalSeconds: number): string {
   return `${minutes}:${seconds}`;
 }
 
-export default function LandingScreen() {
+function LandingScreen() {
   const scrollRef = useRef<ScrollView | null>(null);
   const currentScrollYRef = useRef(0);
   const { currentLanguageProfile, isLoadingLanguage } = useLanguageContext();
@@ -653,6 +653,8 @@ export default function LandingScreen() {
     </Screen>
   );
 }
+
+export default memo(LandingScreen);
 
 const styles = StyleSheet.create({
   title: {

@@ -3,6 +3,7 @@ import React, {
   ReactNode,
   useContext,
   useEffect,
+  useMemo,
   useState,
 } from "react";
 import type { UserLanguageProfileOut } from "../types";
@@ -65,16 +66,23 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  const value = useMemo(
+    () => ({
+      currentLanguageProfile,
+      setCurrentLanguageProfile,
+      isLoadingLanguage,
+      languageProfiles,
+      refreshLanguageProfiles,
+    }),
+    [
+      currentLanguageProfile,
+      isLoadingLanguage,
+      languageProfiles,
+    ]
+  );
+
   return (
-    <LanguageContext.Provider
-      value={{
-        currentLanguageProfile,
-        setCurrentLanguageProfile,
-        isLoadingLanguage,
-        languageProfiles,
-        refreshLanguageProfiles,
-      }}
-    >
+    <LanguageContext.Provider value={value}>
       {children}
     </LanguageContext.Provider>
   );

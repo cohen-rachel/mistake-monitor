@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { memo, useEffect, useState } from "react";
 import { StyleSheet, Text, TextInput, View } from "react-native";
 import Screen from "../components/Screen";
 import SectionCard from "../components/SectionCard";
@@ -16,7 +16,7 @@ import type {
 } from "../types";
 import { colors } from "../theme";
 
-export default function RewriteScreen() {
+function RewriteScreen() {
   const { currentLanguageProfile, isLoadingLanguage } = useLanguageContext();
   const { dataRefreshVersion } = useLandingState();
   const [exercise, setExercise] = useState<RewriteExerciseResponse | null>(null);
@@ -248,6 +248,8 @@ export default function RewriteScreen() {
     </Screen>
   );
 }
+
+export default memo(RewriteScreen);
 
 const styles = StyleSheet.create({
   title: {
