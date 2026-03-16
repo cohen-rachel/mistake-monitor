@@ -24,6 +24,7 @@ interface Props {
   placeholder?: string;
   disabled?: boolean;
   variant?: "light" | "dark";
+  compact?: boolean;
 }
 
 export default function SelectField({
@@ -34,6 +35,7 @@ export default function SelectField({
   placeholder = "Select...",
   disabled = false,
   variant = "light",
+  compact = false,
 }: Props) {
   const [open, setOpen] = useState(false);
 
@@ -62,13 +64,14 @@ export default function SelectField({
         };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, compact && styles.containerCompact]}>
       {label ? <Text style={[styles.label, { color: palette.subtext }]}>{label}</Text> : null}
       <TouchableOpacity
         disabled={disabled}
         onPress={() => setOpen(true)}
         style={[
           styles.trigger,
+          compact && styles.triggerCompact,
           {
             borderColor: palette.border,
             backgroundColor: disabled ? colors.surfaceMuted : palette.background,
@@ -79,13 +82,15 @@ export default function SelectField({
           <Text style={[styles.triggerText, { color: palette.text }]} numberOfLines={1}>
             {selected?.label || placeholder}
           </Text>
-          {selected?.subtitle ? (
+          {selected?.subtitle && !compact ? (
             <Text style={[styles.triggerSubtitle, { color: palette.subtext }]} numberOfLines={1}>
               {selected.subtitle}
             </Text>
           ) : null}
         </View>
-        <Text style={[styles.chevron, { color: palette.subtext }]}>v</Text>
+        <Text style={[styles.chevron, compact && styles.chevronCompact, { color: palette.subtext }]}>
+          ▾
+        </Text>
       </TouchableOpacity>
 
       <Modal visible={open} animationType="fade" transparent onRequestClose={() => setOpen(false)}>
@@ -143,6 +148,9 @@ const styles = StyleSheet.create({
   container: {
     minWidth: 180,
   },
+  containerCompact: {
+    minWidth: 118,
+  },
   label: {
     fontSize: 12,
     fontWeight: "600",
@@ -159,8 +167,14 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: 10,
   },
+  triggerCompact: {
+    minHeight: 36,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+  },
   triggerCopy: {
     flex: 1,
+    minWidth: 0,
   },
   triggerText: {
     fontSize: 14,
@@ -173,6 +187,13 @@ const styles = StyleSheet.create({
   chevron: {
     fontSize: 14,
     fontWeight: "700",
+    width: 16,
+    textAlign: "center",
+    flexShrink: 0,
+  },
+  chevronCompact: {
+    width: 14,
+    fontSize: 12,
   },
   backdrop: {
     flex: 1,

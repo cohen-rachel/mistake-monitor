@@ -181,66 +181,51 @@ export default function LandingScreen() {
     };
   }, [estimatedLevel, selectedTopic, selectedTopicKey]);
 
-  const handleAnalyzeTranscript = useCallback(async () => {
-    if (!currentLanguageProfile) {
-      setStatusMsg("Select a language profile first.");
-      return;
-    }
-    if (!liveTranscript.trim()) {
-      setStatusMsg("Type or paste transcript text before analyzing.");
-      return;
-    }
-    setAnalyzing(true);
-    try {
-      setStatusMsg("Saving session...");
-      const session = await createSessionWithTranscript(
-        liveTranscript.trim(),
-        currentLanguageProfile.id,
-        buildPracticeSelection()
-      );
-      setStatusMsg("Analyzing...");
-      const result = await analyzeSession(session.id);
-      setMistakes(result.mistakes);
-      setTranscriptAnalyzed(true);
-      setStatusMsg(
-        result.mistakes.length > 0
-          ? `Found ${result.mistakes.length} mistake(s).`
-          : "No mistakes found. This session will still appear in History and Insights."
-      );
-    } catch (err: any) {
-      setStatusMsg(err?.message || "Transcript analysis failed.");
-    } finally {
-      setAnalyzing(false);
-    }
-  }, [buildPracticeSelection, currentLanguageProfile, liveTranscript]);
-
   const handleAnalyzeRecordedAudio = async () => {
     if (!currentLanguageProfile) {
       setStatusMsg("Select a language profile first.");
       return;
     }
-    if (!recordedFile) {
-      setStatusMsg("Record audio first.");
+    if (!recordedFile && !liveTranscript.trim()) {
+      setStatusMsg("Record audio first, or type transcript text before analyzing.");
       return;
     }
     setAnalyzing(true);
     try {
-      setStatusMsg("Uploading recorded audio...");
-      const session = await createSessionWithAudio(
-        recordedFile,
-        currentLanguageProfile.id,
-        buildPracticeSelection()
-      );
-      setLiveTranscript(session.transcript?.raw_text || "");
-      setMistakes(session.mistakes || []);
-      setTranscriptAnalyzed(true);
-      setStatusMsg(
-        session.mistakes.length > 0
-          ? `Found ${session.mistakes.length} mistake(s).`
-          : "No mistakes found. This session will still appear in History and Insights."
-      );
+      if (recordedFile) {
+        setStatusMsg("Uploading recorded audio...");
+        const session = await createSessionWithAudio(
+          recordedFile,
+          currentLanguageProfile.id,
+          buildPracticeSelection()
+        );
+        setLiveTranscript(session.transcript?.raw_text || "");
+        setMistakes(session.mistakes || []);
+        setTranscriptAnalyzed(true);
+        setStatusMsg(
+          session.mistakes.length > 0
+            ? `Found ${session.mistakes.length} mistake(s).`
+            : "No mistakes found. This session will still appear in History and Insights."
+        );
+      } else {
+        setStatusMsg("Saving session...");
+        const session = await createSessionWithTranscript(
+          liveTranscript.trim(),
+          currentLanguageProfile.id,
+          buildPracticeSelection()
+        );
+        setStatusMsg("Analyzing...");
+        const result = await analyzeSession(session.id);
+        setMistakes(result.mistakes);
+        setTranscriptAnalyzed(true);
+        setStatusMsg(
+          result.mistakes.length > 0
+            ? `Found ${result.mistakes.length} mistake(s).`
+            : "No mistakes found. This session will still appear in History and Insights."
+        );
+      }
     } catch (err: any) {
-      setStatusMsg(err?.message || "Recorded audio upload failed.");
+      setStatusMsg(err?.message || "Analysis failed.");
     } finally {
       setAnalyzing(false);
     }
@@ -431,27 +416,19 @@ export default function LandingScreen() {
 
             <Text style={styles.note}>
               Mobile currently records locally, then uploads the finished file for
-              backend transcription. You can also type a transcript below and analyze
-              it directly.
+              backend transcription. Or type a transcript below and analyze that
+              directly.
             </Text>
 
             <View style={styles.buttonStack}>
               <PrimaryButton
-                label="Analyze Recorded Audio"
+                label={recordedFile ? "Analyze Recorded Audio" : "Analyze"}
                 onPress={() => {
                   void handleAnalyzeRecordedAudio();
                 }}
-                disabled={!recordedFile || isRecording}
+                disabled={(!recordedFile && !liveTranscript.trim()) || isRecording}
                 loading={analyzing}
                 tone="success"
-              />
-              <PrimaryButton
-                label="Analyze Transcript Text"
-                onPress={() => {
-                  void handleAnalyzeTranscript();
-                }}
-                disabled={!liveTranscript.trim() || isRecording}
-                loading={analyzing}
               />
               <PrimaryButton
                 label="Reset"

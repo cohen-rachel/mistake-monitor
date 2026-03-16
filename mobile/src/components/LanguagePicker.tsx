@@ -44,7 +44,7 @@ export default function LanguagePicker() {
   return (
     <View style={styles.wrapper}>
       <SelectField
-        label="Language"
+        label="Profile"
         value={String(currentLanguageProfile.id)}
         options={options}
         onChange={(value) => {
@@ -52,6 +52,7 @@ export default function LanguagePicker() {
         }}
         disabled={languageProfiles.length === 0}
         variant="dark"
+        compact
       />
     </View>
   );
@@ -59,7 +60,7 @@ export default function LanguagePicker() {
 
 const styles = StyleSheet.create({
   wrapper: {
-    minWidth: 190,
+    width: 124,
   },
   label: {
     color: colors.white,

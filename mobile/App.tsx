@@ -34,8 +34,6 @@ function AppShell() {
     insights: false,
     rewrite: false,
   });
-  const { currentLanguageProfile } = useLanguageContext();
-
   const renderedScreens = useMemo(
     () => ({
       home: <LandingScreen />,
@@ -54,11 +52,6 @@ function AppShell() {
         <View style={styles.headerTop}>
           <View>
             <Text style={styles.brand}>Language Tutor</Text>
-            <Text style={styles.subtitle}>
-              {currentLanguageProfile
-                ? currentLanguageProfile.display_name
-                : "Choose a language profile"}
-            </Text>
           </View>
           <LanguagePicker />
         </View>
@@ -137,11 +130,6 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontSize: 26,
     fontWeight: "800",
-  },
-  subtitle: {
-    color: colors.inkMuted,
-    fontSize: 13,
-    marginTop: 4,
   },
   tabRow: {
     flexDirection: "row",
