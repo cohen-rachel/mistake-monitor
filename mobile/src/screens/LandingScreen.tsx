@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useMemo } from "react";
-import { Text, StyleSheet, TouchableOpacity, View } from "react-native";
+import React, { useCallback, useEffect, useMemo, useRef } from "react";
+import { ScrollView, Text, StyleSheet, TouchableOpacity, View } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
 import Screen from "../components/Screen";
 import SectionCard from "../components/SectionCard";
@@ -30,6 +30,8 @@ function formatDuration(totalSeconds: number): string {
 }
 
 export default function LandingScreen() {
+  const scrollRef = useRef<ScrollView | null>(null);
+  const currentScrollYRef = useRef(0);
   const { currentLanguageProfile, isLoadingLanguage } = useLanguageContext();
   const {
     tab,
@@ -393,7 +395,12 @@ export default function LandingScreen() {
   };
 
   return (
-    <Screen>
+    <Screen
+      ref={scrollRef}
+      onScroll={(event) => {
+        currentScrollYRef.current = event.nativeEvent.contentOffset.y;
+      }}
+    >
       <Text style={styles.title}>Language Tutor</Text>
       <Text style={styles.subtitle}>
         Practice with a suggested topic or choose Free Talk, then get analysis and
@@ -538,6 +545,14 @@ export default function LandingScreen() {
             <TranscriptEditor
               transcript={liveTranscript}
               editable={!isRecording}
+              onFocus={() => {
+                setTimeout(() => {
+                  scrollRef.current?.scrollTo({
+                    y: currentScrollYRef.current + 96,
+                    animated: true,
+                  });
+                }, 120);
+              }}
               onChangeText={(value) => {
                 setLiveTranscript(value);
                 setTranscriptAnalyzed(false);

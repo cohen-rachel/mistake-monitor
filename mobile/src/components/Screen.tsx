@@ -1,26 +1,65 @@
-import React, { ReactNode } from "react";
-import { ScrollView, StyleSheet, View } from "react-native";
+import React, { forwardRef, ReactNode } from "react";
+import {
+  Keyboard,
+  KeyboardAvoidingView,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+} from "react-native";
 import { colors, layout } from "../theme";
 
-export default function Screen({ children }: { children: ReactNode }) {
+const Screen = forwardRef<
+  ScrollView,
+  {
+    children: ReactNode;
+    onScroll?: (event: NativeSyntheticEvent<NativeScrollEvent>) => void;
+  }
+>(function Screen(
+  { children, onScroll },
+  ref
+) {
   return (
-    <ScrollView
-      style={styles.scroll}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
+    <KeyboardAvoidingView
+      style={styles.keyboardArea}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 12 : 0}
     >
-      <View>{children}</View>
-    </ScrollView>
+      <Pressable style={styles.keyboardArea} onPress={Keyboard.dismiss}>
+        <ScrollView
+          ref={ref}
+          style={styles.scroll}
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="always"
+          keyboardDismissMode="none"
+          automaticallyAdjustKeyboardInsets
+          onScroll={onScroll}
+          scrollEventThrottle={16}
+        >
+          <View>{children}</View>
+        </ScrollView>
+      </Pressable>
+    </KeyboardAvoidingView>
   );
-}
+});
+
+export default Screen;
 
 const styles = StyleSheet.create({
+  keyboardArea: {
+    flex: 1,
+  },
   scroll: {
     flex: 1,
     backgroundColor: colors.background,
   },
   content: {
+    flexGrow: 1,
     padding: layout.screenPadding,
-    paddingBottom: 40,
+    paddingBottom: 160,
   },
 });
