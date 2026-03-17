@@ -86,13 +86,12 @@ async def list_topics(
     language_code: str = Query(..., description="Language code to filter topics"),
     db: AsyncSession = Depends(get_db),
 ):
-    """Return topic options chosen by estimated learner level plus free-talk option."""
+    """Return all configured topic options, prioritizing the estimated learner level."""
     estimated_level = await _estimate_level(db, user_id=user_id, language_code=language_code)
     topics = _load_topics()
 
-    filtered = [t for t in topics if t.level == estimated_level]
-    if not filtered:
-        filtered = [t for t in topics if t.level == "beginner"] # Fallback to beginner if no topics for estimated level
+    prioritized = [t for t in topics if t.level == estimated_level]
+    remaining = [t for t in topics if t.level != estimated_level]
 
     free_talk = TopicItem(
         key="free_talk",
@@ -100,7 +99,10 @@ async def list_topics(
         prompt="Speak freely about anything you want with no fixed prompt.",
         level=estimated_level,
     )
-    return TopicListResponse(estimated_level=estimated_level, topics=[free_talk, *filtered])
+    return TopicListResponse(
+        estimated_level=estimated_level,
+        topics=[free_talk, *prioritized, *remaining],
+    )
 
 
 @router.get("/history", response_model=TopicHistoryResponse)
