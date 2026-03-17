@@ -1,5 +1,6 @@
 """Analysis service — orchestrates LLM call, parses JSON, stores Mistakes."""
 
+from datetime import datetime, timezone
 import json
 import logging
 import re
@@ -11,13 +12,19 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import (
+    ImprovementEvent,
     Mistake,
+    MistakeMemory,
     MistakeType,
     Session,
     Transcript,
     SessionLanguageProfile,
 )
-from app.schemas import AnalysisResult, LLMMistake
+from app.schemas import (
+    AnalysisResult,
+    ImprovementMatchResponse,
+    LLMMistake,
+)
 from app.services.llm.factory import get_llm_provider
 
 logger = logging.getLogger(__name__)
@@ -25,7 +32,8 @@ logger = logging.getLogger(__name__)
 COMMON_PROMPT_SUFFIX = (
     "When given a transcript string, output JSON exactly in the schema specified. "
     "For each suspected error, include type, span text, character indices, suggested "
-    "correction, short pedagogical explanation (1-2 sentences), and confidence. "
+    "correction, short pedagogical explanation (1-2 sentences), confidence, a broad skill_family, a specific pattern_label, "
+    "and canonical wrong/correct examples for the construction when possible. "
     "Be highly conservative: only flag clear learner mistakes that genuinely require correction. "
     "Do not flag stylistic preferences, more formal alternatives, paraphrases, or wording that is merely less polished. "
     "If a phrase is grammatical and acceptable in spontaneous conversation, do not flag it. "
@@ -45,7 +53,9 @@ COMMON_PROMPT_SUFFIX = (
     "matching this schema: "
     '{"mistakes": [{"type": "str", "span_text": "str", "start_char": 0, '
     '"end_char": 0, "suggested_correction": "str", "explanation": "str", '
-    '"confidence": 0.0, "stt_uncertain": false, "uncertain": false, '
+    '"confidence": 0.0, "skill_family": "str", "pattern_label": "str", '
+    '"canonical_wrong_example": "str", "canonical_correct_example": "str", '
+    '"stt_uncertain": false, "uncertain": false, '
     '"uncertain_reason": null}]}'
 )
 
@@ -136,6 +146,17 @@ class LanguageMismatchError(ValueError):
         super().__init__(
             f"Language mismatch: transcript is in {transcript_language} but you are aiming to correct {target_language}"
         )
+
+
+_NO_ERROR_EXPLANATION_PATTERN = re.compile(
+    r"\b(grammatically correct|not an error|not a mistake|acceptable as is)\b",
+    re.IGNORECASE,
+)
+
+_STYLE_ONLY_EXPLANATION_PATTERN = re.compile(
+    r"\b(formality|formal|informal|style|stylistic|register|more natural|more polished)\b",
+    re.IGNORECASE,
+)
 
 
 def _build_user_prompt(
@@ -267,6 +288,265 @@ async def _resolve_mistake_type(db: AsyncSession, code: str) -> int:
     raise ValueError(f"MistakeType 'other' not found. Run seed first.")
 
 
+def _normalize_text_for_comparison(text: Optional[str]) -> str:
+    if not text:
+        return ""
+    normalized = re.sub(r"\s+", " ", text.strip().lower())
+    normalized = re.sub(r"^[\"'`]+|[\"'`]+$", "", normalized)
+    normalized = re.sub(r"[.!?,;:]+$", "", normalized)
+    return normalized
+
+
+def _fallback_explanation(code: str) -> str:
+    explanations = {
+        "verb-tense": "Use the verb form that matches the intended tense or aspect.",
+        "subject-verb-agreement": "Use the verb form that agrees with the subject.",
+        "article": "Use the required article for this noun phrase.",
+        "preposition": "Use the preposition that fits this construction.",
+        "word-order": "Reorder the words to match the normal grammar of the sentence.",
+        "pronoun": "Use the pronoun form required by this sentence.",
+        "pluralization": "Use the singular or plural form that matches the meaning.",
+        "vocabulary": "Use the word that matches the intended meaning in this context.",
+        "false-friend": "This word choice does not match the intended meaning in context.",
+        "other": "This requires a grammatical correction in standard usage, not just a style change.",
+    }
+    return explanations.get(
+        code,
+        "This requires a grammatical correction in standard usage, not just a style change.",
+    )
+
+
+def _fallback_skill_family(mistake: LLMMistake) -> str:
+    if mistake.skill_family:
+        return mistake.skill_family.strip()
+    if mistake.type == "verb-tense":
+        return "tense_aspect_usage"
+    if mistake.type == "subject-verb-agreement":
+        return "subject_verb_agreement"
+    if mistake.type == "article":
+        return "article_usage"
+    if mistake.type == "preposition":
+        return "preposition_usage"
+    return mistake.type.strip() or "general_grammar"
+
+
+def _fallback_pattern_label(mistake: LLMMistake) -> str:
+    if mistake.pattern_label:
+        return mistake.pattern_label.strip()
+    if mistake.suggested_correction:
+        return f"{mistake.type}:{_normalize_text_for_comparison(mistake.suggested_correction)[:80]}"
+    if mistake.span_text:
+        return f"{mistake.type}:{_normalize_text_for_comparison(mistake.span_text)[:80]}"
+    return mistake.type.strip() or "general_pattern"
+
+
+def _clean_llm_mistake(mistake: LLMMistake) -> Optional[LLMMistake]:
+    span_normalized = _normalize_text_for_comparison(mistake.span_text)
+    correction_normalized = _normalize_text_for_comparison(mistake.suggested_correction)
+
+    if not correction_normalized:
+        logger.info("Dropping LLM mistake with empty correction: %s", mistake.model_dump())
+        return None
+
+    if span_normalized and span_normalized == correction_normalized:
+        logger.info("Dropping no-op LLM correction: %s", mistake.model_dump())
+        return None
+
+    explanation = (mistake.explanation or "").strip()
+    if not explanation:
+        explanation = _fallback_explanation(mistake.type)
+    elif _NO_ERROR_EXPLANATION_PATTERN.search(explanation) or _STYLE_ONLY_EXPLANATION_PATTERN.search(explanation):
+        explanation = _fallback_explanation(mistake.type)
+
+    return mistake.model_copy(
+        update={
+            "explanation": explanation,
+            "skill_family": _fallback_skill_family(mistake),
+            "pattern_label": _fallback_pattern_label(mistake),
+        }
+    )
+
+
+def _split_sentences(text: str) -> list[str]:
+    if not text.strip():
+        return []
+    parts = re.split(r"(?<=[.!?。！？])\s+|\n+", text.strip())
+    return [part.strip() for part in parts if part.strip()]
+
+
+def _extract_sentence(text: str, start_char: int | None, end_char: int | None) -> str:
+    if not text:
+        return ""
+    if start_char is None or end_char is None:
+        return text.strip()
+
+    punct = ".!?。！？\n"
+    left = max(0, start_char)
+    right = min(len(text), end_char)
+
+    while left > 0 and text[left - 1] not in punct:
+        left -= 1
+    while right < len(text) and text[right] not in punct:
+        right += 1
+    if right < len(text):
+        right += 1
+
+    return text[left:right].strip()
+
+
+def _memory_signature(memory: MistakeMemory) -> tuple[str, str]:
+    return (
+        _normalize_text_for_comparison(memory.skill_family),
+        _normalize_text_for_comparison(memory.pattern_label),
+    )
+
+
+async def _upsert_mistake_memory(
+    db: AsyncSession,
+    language_profile_id: int,
+    mistake: Mistake,
+    mistake_type_code: str,
+) -> tuple[MistakeMemory, bool]:
+    existing_query = (
+        select(MistakeMemory)
+        .where(
+            MistakeMemory.language_profile_id == language_profile_id,
+            MistakeMemory.skill_family == (mistake.skill_family or ""),
+            MistakeMemory.pattern_label == (mistake.pattern_label or ""),
+        )
+        .order_by(MistakeMemory.id.desc())
+        .limit(1)
+    )
+    existing_result = await db.execute(existing_query)
+    existing = existing_result.scalar_one_or_none()
+    is_repeat = existing is not None
+
+    if existing:
+        existing.source_mistake_id = mistake.id
+        existing.mistake_type_code = mistake_type_code
+        existing.wrong_form = mistake.transcript_span
+        existing.correct_form = mistake.suggested_correction
+        existing.canonical_wrong_example = mistake.canonical_wrong_example or mistake.transcript_span
+        existing.canonical_correct_example = mistake.canonical_correct_example or mistake.suggested_correction
+        existing.explanation = mistake.explanation_short
+        existing.status = "repeated"
+        existing.occurrence_count += 1
+        existing.last_seen_at = datetime.now(timezone.utc)
+        return existing, is_repeat
+
+    memory = MistakeMemory(
+        language_profile_id=language_profile_id,
+        source_mistake_id=mistake.id,
+        mistake_type_code=mistake_type_code,
+        skill_family=mistake.skill_family or mistake_type_code,
+        pattern_label=mistake.pattern_label or mistake_type_code,
+        wrong_form=mistake.transcript_span,
+        correct_form=mistake.suggested_correction,
+        canonical_wrong_example=mistake.canonical_wrong_example or mistake.transcript_span,
+        canonical_correct_example=mistake.canonical_correct_example or mistake.suggested_correction,
+        explanation=mistake.explanation_short,
+        status="open",
+    )
+    db.add(memory)
+    await db.flush()
+    return memory, is_repeat
+
+
+def _parse_improvement_response(raw: str) -> ImprovementMatchResponse:
+    text = _strip_code_fences(raw)
+    data = json.loads(text)
+    return ImprovementMatchResponse(**data)
+
+
+async def _record_speaking_improvement_wins(
+    db: AsyncSession,
+    session: Session,
+    language_profile_id: int,
+    transcript_text: str,
+    current_memory_signatures: set[tuple[str, str]],
+) -> None:
+    sentences = _split_sentences(transcript_text)
+    if not sentences:
+        return
+
+    candidate_query = (
+        select(MistakeMemory)
+        .where(
+            MistakeMemory.language_profile_id == language_profile_id,
+            MistakeMemory.status.in_(("open", "repeated")),
+        )
+        .order_by(MistakeMemory.last_seen_at.desc())
+        .limit(20)
+    )
+    candidate_result = await db.execute(candidate_query)
+    candidates = [
+        memory
+        for memory in candidate_result.scalars().all()
+        if _memory_signature(memory) not in current_memory_signatures
+    ]
+    if not candidates:
+        return
+
+    memory_lines = []
+    for memory in candidates:
+        memory_lines.append(
+            json.dumps(
+                {
+                    "memory_id": memory.id,
+                    "skill_family": memory.skill_family,
+                    "pattern_label": memory.pattern_label,
+                    "wrong_form": memory.wrong_form,
+                    "correct_form": memory.correct_form,
+                    "canonical_wrong_example": memory.canonical_wrong_example,
+                    "canonical_correct_example": memory.canonical_correct_example,
+                    "explanation": memory.explanation,
+                },
+                ensure_ascii=False,
+            )
+        )
+
+    system_prompt = (
+        "You evaluate whether a new speaking transcript shows a clear speaking improvement relative to prior mistake memories. "
+        "Return only clear wins. A win means the speaker now uses the same grammar family or construction correctly in speech. "
+        "Be conservative. Do not return repeats or unrelated sentences. Output valid JSON only in the requested schema."
+    )
+    user_prompt = "\n".join(
+        [
+            f"Language code: {session.language}",
+            "Transcript sentences:",
+            *[f"- {sentence}" for sentence in sentences[:25]],
+            "",
+            "Prior open mistake memories:",
+            *memory_lines,
+            "",
+            'Return JSON like: {"events":[{"memory_id":1,"sentence_text":"...","reason":"...","confidence":0.0}]}',
+        ]
+    )
+
+    llm = get_llm_provider()
+    raw = await llm.complete(system_prompt, user_prompt)
+    logger.info("Improvement win raw response: %s", raw[:500])
+    parsed = _parse_improvement_response(raw)
+
+    for item in parsed.events:
+        memory = next((candidate for candidate in candidates if candidate.id == item.memory_id), None)
+        if memory is None:
+            continue
+        memory.status = "improved"
+        memory.improvement_count += 1
+        db.add(
+            ImprovementEvent(
+                language_profile_id=language_profile_id,
+                session_id=session.id,
+                memory_id=memory.id,
+                event_type="win",
+                sentence_text=item.sentence_text,
+                reason=item.reason,
+                confidence=item.confidence,
+            )
+        )
+
+
 async def analyze_transcript(
     db: AsyncSession,
     session_id: int,
@@ -283,7 +563,8 @@ async def analyze_transcript(
     link_result = await db.execute(
         select(SessionLanguageProfile).where(SessionLanguageProfile.session_id == session_id)
     )
-    if link_result.scalar_one_or_none() is None:
+    language_profile_link = link_result.scalar_one_or_none()
+    if language_profile_link is None:
         logger.info("Session %s has no language profile link yet; proceeding with session.language", session_id)
 
     # Get transcript text
@@ -376,9 +657,15 @@ async def analyze_transcript(
         logger.exception("LLM analysis failed during completion/parsing; inspect prompts and response above.")
         logger.debug("LLM Raw Response (truncated): %s", raw_response[:500])
 
+    cleaned_mistakes = [
+        cleaned
+        for item in llm_mistakes
+        if (cleaned := _clean_llm_mistake(item)) is not None
+    ]
+
     db_mistakes: list[Mistake] = []
     if not analysis_failed:
-        for m in llm_mistakes:
+        for m in cleaned_mistakes:
             type_id = await _resolve_mistake_type(db, m.type)
             mistake = Mistake(
                 session_id=session_id,
@@ -389,6 +676,10 @@ async def analyze_transcript(
                 suggested_correction=m.suggested_correction,
                 explanation_short=m.explanation,
                 confidence=m.confidence,
+                skill_family=m.skill_family,
+                pattern_label=m.pattern_label,
+                canonical_wrong_example=m.canonical_wrong_example,
+                canonical_correct_example=m.canonical_correct_example,
                 stt_uncertain=m.stt_uncertain,
                 uncertain=m.uncertain,
                 uncertain_reason=m.uncertain_reason,
@@ -404,6 +695,51 @@ async def analyze_transcript(
     # Refresh to get IDs and relationships
     for m in db_mistakes:
         await db.refresh(m)
+
+    if not analysis_failed and language_profile_link is not None:
+        memory_signatures: set[tuple[str, str]] = set()
+        for mistake in db_mistakes:
+            mt_result = await db.execute(
+                select(MistakeType.code).where(MistakeType.id == mistake.mistake_type_id)
+            )
+            mistake_type_code = mt_result.scalar_one()
+            memory, is_repeat = await _upsert_mistake_memory(
+                db,
+                language_profile_id=language_profile_link.language_profile_id,
+                mistake=mistake,
+                mistake_type_code=mistake_type_code,
+            )
+            memory_signatures.add(_memory_signature(memory))
+            if is_repeat:
+                sentence_text = _extract_sentence(
+                    transcript_text,
+                    mistake.start_char,
+                    mistake.end_char,
+                )
+                db.add(
+                    ImprovementEvent(
+                        language_profile_id=language_profile_link.language_profile_id,
+                        session_id=session.id,
+                        memory_id=memory.id,
+                        event_type="repeat",
+                        sentence_text=sentence_text,
+                        reason=f"You repeated a previously seen pattern: {memory.pattern_label}.",
+                        confidence=mistake.confidence,
+                    )
+                )
+
+        try:
+            await _record_speaking_improvement_wins(
+                db,
+                session=session,
+                language_profile_id=language_profile_link.language_profile_id,
+                transcript_text=transcript_text,
+                current_memory_signatures=memory_signatures,
+            )
+        except Exception:
+            logger.exception("Speaking-improvement win detection failed for session %s", session.id)
+
+        await db.commit()
 
     if language_mismatch_error:
         raise ValueError(str(language_mismatch_error))

@@ -50,6 +50,10 @@ class MistakeOut(BaseModel):
     explanation_short: Optional[str] = None
     confidence: Optional[float] = None
     canonical_example: Optional[str] = None
+    skill_family: Optional[str] = None
+    pattern_label: Optional[str] = None
+    canonical_wrong_example: Optional[str] = None
+    canonical_correct_example: Optional[str] = None
     stt_uncertain: bool = False
     uncertain: bool = False
     uncertain_reason: Optional[str] = None
@@ -113,6 +117,10 @@ class LLMMistake(BaseModel):
     suggested_correction: Optional[str] = None
     explanation: Optional[str] = None
     confidence: Optional[float] = None
+    skill_family: Optional[str] = None
+    pattern_label: Optional[str] = None
+    canonical_wrong_example: Optional[str] = None
+    canonical_correct_example: Optional[str] = None
     stt_uncertain: bool = False
     uncertain: bool = False
     uncertain_reason: Optional[str] = None
@@ -120,6 +128,17 @@ class LLMMistake(BaseModel):
 
 class AnalysisResult(BaseModel):
     mistakes: list[LLMMistake]
+
+
+class ImprovementMatchItem(BaseModel):
+    memory_id: int
+    sentence_text: str
+    reason: Optional[str] = None
+    confidence: Optional[float] = None
+
+
+class ImprovementMatchResponse(BaseModel):
+    events: list[ImprovementMatchItem]
 
 
 class AnalyzeResponse(BaseModel):

@@ -5,7 +5,15 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.models import Mistake, MistakeType, Session, Transcript, RewriteAttempt, SessionLanguageProfile, UserLanguageProfile
+from app.models import (
+    ImprovementEvent,
+    Mistake,
+    MistakeMemory,
+    MistakeType,
+    Session,
+    Transcript,
+    SessionLanguageProfile,
+)
 from app.schemas import (
     InsightsResponse,
     MistakeCountItem,
@@ -201,42 +209,34 @@ async def get_insights(
             )
         )
 
-    # 5. Improvement banners from rewrite training wins.
+    # 5. Improvement banners from speaking-based improvement wins.
     improvement_banners: list[str] = []
-    profile_result = await db.execute(
-        select(UserLanguageProfile.language_code).where(UserLanguageProfile.id == language_profile_id)
-    )
-    language_code = profile_result.scalar_one_or_none()
-    if language_code: #TODO: fix this to use new inputs
-
-        rewrite_query = (
-            select(RewriteAttempt)
-            .where(RewriteAttempt.language_code == language_code)
-            .order_by(RewriteAttempt.created_at.desc())
-            .limit(200)
+    improvement_query = (
+        select(ImprovementEvent, MistakeMemory)
+        .join(MistakeMemory, MistakeMemory.id == ImprovementEvent.memory_id)
+        .where(
+            ImprovementEvent.language_profile_id == language_profile_id,
+            ImprovementEvent.event_type == "win",
         )
-        rewrite_result = await db.execute(rewrite_query)
-        rewrite_attempts = rewrite_result.scalars().all()
-
-        # Group by mistake pair and check for "was wrong before, now correct" pattern.
-        grouped: dict[tuple[str, str], list[RewriteAttempt]] = {}
-        for attempt in rewrite_attempts:
-            wrong = (attempt.wrong_span or "").strip()
-            corr = (attempt.expected_correction or "").strip()
-            if not wrong or not corr:
-                continue
-            grouped.setdefault((wrong, corr), []).append(attempt)
-
-        for (wrong, corr), attempts in grouped.items():
-            ordered = sorted(attempts, key=lambda a: a.created_at)
-            had_wrong = any(not a.is_correct for a in ordered[:-1])
-            latest = ordered[-1]
-            if had_wrong and latest.is_correct:
-                improvement_banners.append(
-                    f"Improvement win: You previously struggled with '{wrong}', and now corrected it to '{corr}'."
-                )
-            if len(improvement_banners) >= 3:
-                break
+        .order_by(ImprovementEvent.created_at.desc())
+        .limit(20)
+    )
+    improvement_result = await db.execute(improvement_query)
+    seen_memory_ids: set[int] = set()
+    for event, memory in improvement_result.all():
+        if memory.id in seen_memory_ids:
+            continue
+        seen_memory_ids.add(memory.id)
+        if memory.correct_form:
+            improvement_banners.append(
+                f"Speaking win: You previously struggled with '{memory.wrong_form or memory.pattern_label}', and now used '{memory.correct_form}' correctly in speech."
+            )
+        else:
+            improvement_banners.append(
+                f"Speaking win: You showed improvement in '{memory.skill_family}' during speaking practice."
+            )
+        if len(improvement_banners) >= 3:
+            break
 
     return InsightsResponse(
         top_mistakes=top_mistakes,

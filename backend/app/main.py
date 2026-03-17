@@ -73,6 +73,103 @@ async def _ensure_sqlite_schema_compatibility() -> None:
             )
             logger.info("Applied SQLite compatibility migration for rewrite_attempts.language_code")
 
+        result = await conn.execute(text("PRAGMA table_info(mistakes)"))
+        mistake_columns = {row[1] for row in result.fetchall()}
+        if mistake_columns and "skill_family" not in mistake_columns:
+            await conn.execute(
+                text("ALTER TABLE mistakes ADD COLUMN skill_family VARCHAR(200)")
+            )
+            logger.info("Applied SQLite compatibility migration for mistakes.skill_family")
+        if mistake_columns and "pattern_label" not in mistake_columns:
+            await conn.execute(
+                text("ALTER TABLE mistakes ADD COLUMN pattern_label VARCHAR(200)")
+            )
+            logger.info("Applied SQLite compatibility migration for mistakes.pattern_label")
+        if mistake_columns and "canonical_wrong_example" not in mistake_columns:
+            await conn.execute(
+                text("ALTER TABLE mistakes ADD COLUMN canonical_wrong_example VARCHAR(500)")
+            )
+            logger.info("Applied SQLite compatibility migration for mistakes.canonical_wrong_example")
+        if mistake_columns and "canonical_correct_example" not in mistake_columns:
+            await conn.execute(
+                text("ALTER TABLE mistakes ADD COLUMN canonical_correct_example VARCHAR(500)")
+            )
+            logger.info("Applied SQLite compatibility migration for mistakes.canonical_correct_example")
+
+        await conn.execute(
+            text(
+                "CREATE TABLE IF NOT EXISTS mistake_memories ("
+                "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                "language_profile_id INTEGER NOT NULL, "
+                "source_mistake_id INTEGER NOT NULL, "
+                "mistake_type_code VARCHAR(50) NOT NULL, "
+                "skill_family VARCHAR(200) NOT NULL, "
+                "pattern_label VARCHAR(200) NOT NULL, "
+                "wrong_form VARCHAR(500), "
+                "correct_form VARCHAR(500), "
+                "canonical_wrong_example VARCHAR(500), "
+                "canonical_correct_example VARCHAR(500), "
+                "explanation TEXT, "
+                "status VARCHAR(20) NOT NULL DEFAULT 'open', "
+                "occurrence_count INTEGER NOT NULL DEFAULT 1, "
+                "improvement_count INTEGER NOT NULL DEFAULT 0, "
+                "created_at DATETIME NOT NULL, "
+                "last_seen_at DATETIME NOT NULL, "
+                "FOREIGN KEY(language_profile_id) REFERENCES user_language_profiles(id), "
+                "FOREIGN KEY(source_mistake_id) REFERENCES mistakes(id)"
+                ")"
+            )
+        )
+        await conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_mistake_memories_language_profile_id "
+                "ON mistake_memories (language_profile_id)"
+            )
+        )
+        await conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_mistake_memories_skill_family "
+                "ON mistake_memories (skill_family)"
+            )
+        )
+        await conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_mistake_memories_pattern_label "
+                "ON mistake_memories (pattern_label)"
+            )
+        )
+
+        await conn.execute(
+            text(
+                "CREATE TABLE IF NOT EXISTS improvement_events ("
+                "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                "language_profile_id INTEGER NOT NULL, "
+                "session_id INTEGER NOT NULL, "
+                "memory_id INTEGER NOT NULL, "
+                "event_type VARCHAR(20) NOT NULL, "
+                "sentence_text TEXT, "
+                "reason TEXT, "
+                "confidence FLOAT, "
+                "created_at DATETIME NOT NULL, "
+                "FOREIGN KEY(language_profile_id) REFERENCES user_language_profiles(id), "
+                "FOREIGN KEY(session_id) REFERENCES sessions(id), "
+                "FOREIGN KEY(memory_id) REFERENCES mistake_memories(id)"
+                ")"
+            )
+        )
+        await conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_improvement_events_language_profile_id "
+                "ON improvement_events (language_profile_id)"
+            )
+        )
+        await conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_improvement_events_session_id "
+                "ON improvement_events (session_id)"
+            )
+        )
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

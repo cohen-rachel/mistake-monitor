@@ -134,6 +134,10 @@ class Mistake(Base):
     explanation_short = Column(Text, nullable=True)
     confidence = Column(Float, nullable=True)
     canonical_example = Column(String(500), nullable=True)
+    skill_family = Column(String(200), nullable=True, index=True)
+    pattern_label = Column(String(200), nullable=True, index=True)
+    canonical_wrong_example = Column(String(500), nullable=True)
+    canonical_correct_example = Column(String(500), nullable=True)
     stt_uncertain = Column(Boolean, default=False, nullable=False)
     uncertain = Column(Boolean, default=False, nullable=False)
     uncertain_reason = Column(String(500), nullable=True)
@@ -141,6 +145,7 @@ class Mistake(Base):
     session = relationship("Session", back_populates="mistakes")
     mistake_type = relationship("MistakeType", back_populates="mistakes", lazy="selectin")
     rewrite_attempts = relationship("RewriteAttempt", back_populates="source_mistake", lazy="selectin")
+    memories = relationship("MistakeMemory", back_populates="source_mistake", lazy="selectin")
 
 
 class PracticeAttempt(Base):
@@ -180,3 +185,48 @@ class RewriteAttempt(Base):
 
     user = relationship("User", back_populates="rewrite_attempts")
     source_mistake = relationship("Mistake", back_populates="rewrite_attempts")
+
+
+class MistakeMemory(Base):
+    """Long-lived memory of a recurring speaking mistake pattern for a language profile."""
+    __tablename__ = "mistake_memories"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    language_profile_id = Column(Integer, ForeignKey("user_language_profiles.id"), nullable=False, index=True)
+    source_mistake_id = Column(Integer, ForeignKey("mistakes.id"), nullable=False, index=True)
+    mistake_type_code = Column(String(50), nullable=False, index=True)
+    skill_family = Column(String(200), nullable=False, index=True)
+    pattern_label = Column(String(200), nullable=False, index=True)
+    wrong_form = Column(String(500), nullable=True)
+    correct_form = Column(String(500), nullable=True)
+    canonical_wrong_example = Column(String(500), nullable=True)
+    canonical_correct_example = Column(String(500), nullable=True)
+    explanation = Column(Text, nullable=True)
+    status = Column(String(20), nullable=False, default="open", index=True)  # open | repeated | improved
+    occurrence_count = Column(Integer, nullable=False, default=1)
+    improvement_count = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime, default=utcnow, nullable=False)
+    last_seen_at = Column(DateTime, default=utcnow, nullable=False)
+
+    language_profile = relationship("UserLanguageProfile", lazy="selectin")
+    source_mistake = relationship("Mistake", back_populates="memories", lazy="selectin")
+    events = relationship("ImprovementEvent", back_populates="memory", lazy="selectin")
+
+
+class ImprovementEvent(Base):
+    """Speaking-based improvement or repeat event linked to a prior mistake memory."""
+    __tablename__ = "improvement_events"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    language_profile_id = Column(Integer, ForeignKey("user_language_profiles.id"), nullable=False, index=True)
+    session_id = Column(Integer, ForeignKey("sessions.id"), nullable=False, index=True)
+    memory_id = Column(Integer, ForeignKey("mistake_memories.id"), nullable=False, index=True)
+    event_type = Column(String(20), nullable=False, index=True)  # win | repeat
+    sentence_text = Column(Text, nullable=True)
+    reason = Column(Text, nullable=True)
+    confidence = Column(Float, nullable=True)
+    created_at = Column(DateTime, default=utcnow, nullable=False)
+
+    language_profile = relationship("UserLanguageProfile", lazy="selectin")
+    session = relationship("Session", lazy="selectin")
+    memory = relationship("MistakeMemory", back_populates="events", lazy="selectin")
