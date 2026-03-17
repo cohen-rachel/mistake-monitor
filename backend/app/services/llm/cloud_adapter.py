@@ -1,8 +1,11 @@
 """Cloud LLM adapters (OpenAI / Anthropic)."""
 
 import httpx
+import logging
 from app.config import settings
 from app.services.llm.base import LLMProvider
+
+logger = logging.getLogger(__name__)
 
 
 class OpenAIProvider(LLMProvider):
@@ -26,12 +29,19 @@ class OpenAIProvider(LLMProvider):
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
             ],
-            "temperature": 0.2,
             "response_format": {"type": "json_object"},
         }
+        if not self.model.startswith("gpt-5"):
+            payload["temperature"] = 0.2
 
         async with httpx.AsyncClient(timeout=60.0) as client:
             resp = await client.post(url, headers=headers, json=payload)
+            if resp.is_error:
+                logger.error(
+                    "OpenAI chat completion failed with %s: %s",
+                    resp.status_code,
+                    resp.text[:1000],
+                )
             resp.raise_for_status()
             data = resp.json()
 
