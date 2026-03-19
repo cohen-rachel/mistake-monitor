@@ -198,8 +198,23 @@ export interface TranscriptChunk {
   full_text?: string;
   chunk_index: number;
   is_final?: boolean;
+  is_provisional?: boolean;
   confidence?: number;
   message?: string;
+}
+
+export interface FinalTranscriptionResponse {
+  analysis_text: string;
+  display_text: string;
+  is_provisional: false;
+  transcript_source: string;
+  average_confidence: number;
+  segments: Array<{
+    text: string;
+    start: number;
+    end: number;
+    confidence: number;
+  }>;
 }
 
 export interface UserLanguageProfileOut {

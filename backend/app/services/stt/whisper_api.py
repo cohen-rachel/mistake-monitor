@@ -1,13 +1,18 @@
-"""OpenAI Whisper API adapter for STT."""
+"""OpenAI transcription adapter for final STT."""
 
+import logging
 import httpx
 from app.config import settings
 from app.services.stt.base import STTProvider, TranscriptResult, TranscriptSegment
 from app.services.stt.audio_utils import infer_audio_filename
 
+logger = logging.getLogger(__name__)
+
 
 class WhisperAPIProvider(STTProvider):
-    """Uses OpenAI's Whisper API for speech-to-text."""
+    """Uses OpenAI's transcription API for final speech-to-text."""
+
+    _MODEL_NAME = "gpt-4o-mini-transcribe"
 
     def __init__(self):
         if not settings.openai_api_key:
@@ -18,7 +23,7 @@ class WhisperAPIProvider(STTProvider):
     async def transcribe(
         self,
         audio_bytes: bytes,
-        language: str = "en",
+        language: str | None = None,
         filename: str | None = None,
         content_type: str | None = None,
     ) -> TranscriptResult:
@@ -27,7 +32,7 @@ class WhisperAPIProvider(STTProvider):
     async def transcribe_chunk(
         self,
         audio_bytes: bytes,
-        language: str = "en",
+        language: str | None = None,
         filename: str | None = None,
         content_type: str | None = None,
     ) -> TranscriptResult:
@@ -36,7 +41,7 @@ class WhisperAPIProvider(STTProvider):
     async def _call_whisper(
         self,
         audio_bytes: bytes,
-        language: str,
+        language: str | None,
         filename: str | None = None,
         content_type: str | None = None,
     ) -> TranscriptResult:
@@ -54,11 +59,11 @@ class WhisperAPIProvider(STTProvider):
             ),
         }
         data = {
-            "model": "whisper-1",
-            "language": language,
-            "response_format": "verbose_json",
-            "timestamp_granularities[]": "segment",
+            "model": self._MODEL_NAME,
+            "response_format": "json",
         }
+        if language:
+            data["language"] = language
 
         async with httpx.AsyncClient(timeout=60.0) as client:
             resp = await client.post(self.base_url, headers=headers, files=files, data=data)
@@ -78,4 +83,10 @@ class WhisperAPIProvider(STTProvider):
             )
 
         avg_conf = sum(s.confidence for s in segments) / len(segments) if segments else 1.0
+        logger.info(
+            'Final STT Output (Model: %s, Language Hint: %s): "%s"',
+            self._MODEL_NAME,
+            language,
+            text,
+        )
         return TranscriptResult(text=text, segments=segments, average_confidence=avg_conf)

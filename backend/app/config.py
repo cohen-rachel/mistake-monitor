@@ -8,8 +8,11 @@ class Settings(BaseSettings):
     # Database
     database_url: str = "sqlite+aiosqlite:///./langtutor.db"
 
-    # STT provider: dummy | whisper_api | whisper_local
+    # Legacy STT provider default
     stt_provider: str = "whisper_local"
+    # Explicit STT providers by use case
+    live_stt_provider: str = "whisper_local"
+    final_stt_provider: str = "whisper_api"
 
     # LLM provider: ollama | openai | anthropic
     llm_provider: str = "openai"

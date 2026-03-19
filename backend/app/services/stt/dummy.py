@@ -27,7 +27,7 @@ class DummySTTProvider(STTProvider):
     async def transcribe(
         self,
         audio_bytes: bytes,
-        language: str = "en",
+        language: str | None = None,
         filename: str | None = None,
         content_type: str | None = None,
     ) -> TranscriptResult:
@@ -40,7 +40,7 @@ class DummySTTProvider(STTProvider):
     async def transcribe_chunk(
         self,
         audio_bytes: bytes,
-        language: str = "en",
+        language: str | None = None,
         filename: str | None = None,
         content_type: str | None = None,
     ) -> TranscriptResult:

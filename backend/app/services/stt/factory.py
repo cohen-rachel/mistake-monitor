@@ -3,33 +3,51 @@
 from app.config import settings
 from app.services.stt.base import STTProvider
 
-_cached_provider: STTProvider | None = None
+_cached_providers: dict[str, STTProvider] = {}
 
 
-def get_stt_provider() -> STTProvider:
-    """Return the configured STT provider instance (cached singleton)."""
-    global _cached_provider
-    if _cached_provider is not None:
-        return _cached_provider
-
-    provider = settings.stt_provider.lower()
+def _build_provider(provider: str) -> STTProvider:
+    provider = provider.lower()
 
     if provider == "dummy":
         from app.services.stt.dummy import DummySTTProvider
-        _cached_provider = DummySTTProvider()
+        return DummySTTProvider()
 
-    elif provider == "whisper_api":
+    if provider == "whisper_api":
         from app.services.stt.whisper_api import WhisperAPIProvider
-        _cached_provider = WhisperAPIProvider()
+        return WhisperAPIProvider()
 
-    elif provider == "whisper_local":
+    if provider == "whisper_local":
         from app.services.stt.whisper_local import WhisperLocalProvider
-        _cached_provider = WhisperLocalProvider()
+        return WhisperLocalProvider()
 
-    else:
-        raise ValueError(
-            f"Unknown STT_PROVIDER: '{provider}'. "
-            f"Valid options: dummy, whisper_api, whisper_local"
-        )
+    raise ValueError(
+        f"Unknown STT provider: '{provider}'. "
+        f"Valid options: dummy, whisper_api, whisper_local"
+    )
 
-    return _cached_provider
+
+def _get_provider(provider: str) -> STTProvider:
+    cached = _cached_providers.get(provider)
+    if cached is not None:
+        return cached
+    built = _build_provider(provider)
+    _cached_providers[provider] = built
+    return built
+
+
+def get_live_stt_provider() -> STTProvider:
+    """Return the configured live STT provider."""
+    provider = settings.live_stt_provider or settings.stt_provider
+    return _get_provider(provider)
+
+
+def get_final_stt_provider() -> STTProvider:
+    """Return the configured final STT provider."""
+    provider = settings.final_stt_provider or settings.stt_provider
+    return _get_provider(provider)
+
+
+def get_stt_provider() -> STTProvider:
+    """Backwards-compatible alias for the final STT provider."""
+    return get_final_stt_provider()

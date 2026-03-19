@@ -7,6 +7,7 @@ import type {
   SessionDetailOut,
   SessionListOut,
   AnalyzeResponse,
+  FinalTranscriptionResponse,
   InsightsResponse,
   TopicListResponse,
   TopicHistoryResponse,
@@ -88,6 +89,17 @@ export async function createSessionWithAudio(
     }
   }
   return request<SessionDetailOut>("/sessions", { method: "POST", body: form });
+}
+
+export async function finalizeRecordedAudio(
+  audioFile: File
+): Promise<FinalTranscriptionResponse> {
+  const form = new FormData();
+  form.append("audio_file", audioFile);
+  return request<FinalTranscriptionResponse>("/transcribe/finalize", {
+    method: "POST",
+    body: form,
+  });
 }
 
 export async function listSessions(
@@ -198,13 +210,15 @@ export async function getRewriteStats(
 
 // ---------- WebSocket ----------
 
-export function createTranscribeSocket(language: string = "en"): WebSocket {
+export function createTranscribeSocket(language?: string): WebSocket {
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
   const host = window.location.host;
-  const encodedLanguage = encodeURIComponent(language);
-  return new WebSocket(
-    `${protocol}//${host}/api/transcribe/stream?language=${encodedLanguage}`
-  );
+  const params = new URLSearchParams();
+  if (language) {
+    params.set("language", language);
+  }
+  const query = params.toString();
+  return new WebSocket(`${protocol}//${host}/api/transcribe/stream${query ? `?${query}` : ""}`);
 }
 
 export async function getUserLanguageProfiles(): Promise<UserLanguageProfileOut[]> {

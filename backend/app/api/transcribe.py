@@ -5,7 +5,8 @@ import json
 import logging
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, UploadFile, File, Form
 
-from app.services.stt.factory import get_stt_provider
+from app.schemas import FinalTranscriptionOut
+from app.services.stt.factory import get_final_stt_provider, get_live_stt_provider
 
 logger = logging.getLogger(__name__)
 
@@ -35,11 +36,11 @@ def _shared_prefix_length(previous_text: str, current_text: str) -> int:
 @router.post("")
 async def transcribe_audio(
     audio_file: UploadFile = File(...),
-    language: str = Form("en"),
+    language: str | None = Form(None),
 ):
     """Transcribe an uploaded audio file and return the transcript."""
     audio_bytes = await audio_file.read()
-    stt = get_stt_provider()
+    stt = get_final_stt_provider()
     result = await stt.transcribe(
         audio_bytes,
         language,
@@ -62,6 +63,41 @@ async def transcribe_audio(
     }
 
 
+@router.post("/finalize", response_model=FinalTranscriptionOut)
+async def finalize_recorded_audio(
+    audio_file: UploadFile = File(...),
+    language: str | None = Form(None),
+):
+    """Transcribe a completed recording for authoritative analysis/display text."""
+    audio_bytes = await audio_file.read()
+    stt = get_final_stt_provider()
+    result = await stt.transcribe(
+        audio_bytes,
+        language,
+        filename=audio_file.filename,
+        content_type=audio_file.content_type,
+    )
+
+    segments = [
+        {
+            "text": seg.text,
+            "start": seg.start,
+            "end": seg.end,
+            "confidence": seg.confidence,
+        }
+        for seg in result.segments
+    ]
+    final_text = (result.text or "").strip()
+    return FinalTranscriptionOut(
+        analysis_text=final_text,
+        display_text=final_text,
+        is_provisional=False,
+        transcript_source="final_file_stt",
+        average_confidence=result.average_confidence,
+        segments=segments,
+    )
+
+
 def _decode_base64_audio(payload: str) -> bytes:
     try:
         return base64.b64decode(payload, validate=True)
@@ -77,8 +113,8 @@ async def transcribe_stream(websocket: WebSocket):
     Send a text message 'stop' to end the session.
     """
     await websocket.accept()
-    stt = get_stt_provider()
-    language = websocket.query_params.get("language", "en")
+    stt = get_live_stt_provider()
+    language = websocket.query_params.get("language") or None
     stream_filename = websocket.query_params.get("filename")
     stream_content_type = websocket.query_params.get("content_type")
     chunk_index = 0
@@ -113,6 +149,7 @@ async def transcribe_stream(websocket: WebSocket):
                                 "full_text": previous_full_text,
                                 "chunk_index": chunk_index,
                                 "is_final": True,
+                                "is_provisional": True,
                             })
                             committed_word_count = len(final_words)
                     await websocket.send_json({
@@ -143,6 +180,7 @@ async def transcribe_stream(websocket: WebSocket):
                                 "full_text": previous_full_text,
                                 "chunk_index": chunk_index,
                                 "is_final": True,
+                                "is_provisional": True,
                             })
                     await websocket.send_json({
                         "type": "stopped",
@@ -200,6 +238,7 @@ async def transcribe_stream(websocket: WebSocket):
                             "full_text": full_text,
                             "chunk_index": chunk_index,
                             "is_final": False,
+                            "is_provisional": True,
                             "confidence": result.average_confidence,
                         })
                         committed_word_count = stable_word_count
@@ -251,6 +290,7 @@ async def transcribe_stream(websocket: WebSocket):
                             "full_text": full_text,
                             "chunk_index": chunk_index,
                             "is_final": False,
+                            "is_provisional": True,
                             "confidence": result.average_confidence,
                         })
                         committed_word_count = stable_word_count

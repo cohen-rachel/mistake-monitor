@@ -18,7 +18,7 @@ from app.models import (
     PracticeAttempt,
 )
 from app.schemas import SessionCreate, SessionOut, SessionDetailOut, SessionListOut
-from app.services.stt.factory import get_stt_provider
+from app.services.stt.factory import get_final_stt_provider
 from app.services.analysis import analyze_transcript
 
 router = APIRouter(prefix="/api/sessions", tags=["sessions"])
@@ -92,17 +92,17 @@ async def create_session(
         raise HTTPException(status_code=404, detail="Language profile not found or not owned by user")
     language_code = language_profile.language_code
 
-    stt_provider_name = settings.stt_provider
+    stt_provider_name = settings.final_stt_provider or settings.stt_provider
     stt_confidence = None
     tokens_with_timestamps = None
 
     # If audio file provided, transcribe it
     if audio_file and not transcript_text:
         audio_bytes = await audio_file.read()
-        stt = get_stt_provider()
+        stt = get_final_stt_provider()
         result = await stt.transcribe(
             audio_bytes,
-            language_code,
+            None,
             filename=audio_file.filename,
             content_type=audio_file.content_type,
         )

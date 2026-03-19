@@ -101,6 +101,15 @@ class SessionListOut(BaseModel):
     sessions: list[SessionOut]
 
 
+class FinalTranscriptionOut(BaseModel):
+    analysis_text: str
+    display_text: str
+    is_provisional: bool = False
+    transcript_source: str = "final_file_stt"
+    average_confidence: float = 0.0
+    segments: list[dict] = []
+
+
 # ---------- Analysis ----------
 class AnalyzeRequest(BaseModel):
     session_id: int

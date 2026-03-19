@@ -126,9 +126,16 @@ export default function Landing() {
   const [autoQueueVersion, setAutoQueueVersion] = useState(0);
   const [pendingOverrideSessionId, setPendingOverrideSessionId] = useState<number | null>(null);
   const [pendingOverrideScope, setPendingOverrideScope] = useState<"record" | "upload" | null>(null);
+  const [provisionalTranscript, setProvisionalTranscript] = useState("");
+  const [finalTranscript, setFinalTranscript] = useState("");
+  const [finalizingTranscript, setFinalizingTranscript] = useState(false);
+  const [userEditedTranscript, setUserEditedTranscript] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const liveTranscriptRef = useRef(liveTranscript);
+  const provisionalTranscriptRef = useRef("");
+  const finalTranscriptRef = useRef("");
+  const userEditedTranscriptRef = useRef(false);
   const recordingBaseTranscriptRef = useRef("");
   const recordingSessionFullTranscriptRef = useRef("");
   const pendingAutoTranscriptRef = useRef("");
@@ -144,6 +151,18 @@ export default function Landing() {
   useEffect(() => {
     liveTranscriptRef.current = liveTranscript;
   }, [liveTranscript]);
+
+  useEffect(() => {
+    provisionalTranscriptRef.current = provisionalTranscript;
+  }, [provisionalTranscript]);
+
+  useEffect(() => {
+    finalTranscriptRef.current = finalTranscript;
+  }, [finalTranscript]);
+
+  useEffect(() => {
+    userEditedTranscriptRef.current = userEditedTranscript;
+  }, [userEditedTranscript]);
 
   useEffect(() => {
     setPendingOverrideSessionId(null);
@@ -336,16 +355,56 @@ export default function Landing() {
         .filter(Boolean)
         .join(" ")
         .trim();
-      setLiveTranscript(nextTranscript);
+      setProvisionalTranscript(nextTranscript);
+      if (!userEditedTranscriptRef.current && !finalTranscriptRef.current.trim()) {
+        setLiveTranscript(nextTranscript);
+      }
       setTranscriptAnalyzed(false);
     },
     [setTranscriptAnalyzed]
   );
 
+  const handleFinalTranscript = useCallback(
+    (analysisText: string, displayText: string) => {
+      const mergedAnalysisText = [recordingBaseTranscriptRef.current, analysisText.trim()]
+        .filter(Boolean)
+        .join(" ")
+        .trim();
+      const mergedDisplayText = [recordingBaseTranscriptRef.current, displayText.trim()]
+        .filter(Boolean)
+        .join(" ")
+        .trim();
+
+      setFinalTranscript(mergedAnalysisText);
+      if (!userEditedTranscriptRef.current) {
+        setLiveTranscript(mergedDisplayText);
+        setStatusMsg("Final transcript ready.");
+      } else {
+        setStatusMsg(
+          "Final transcript ready. Your manual edits are preserved and will be used for analysis."
+        );
+      }
+    },
+    [setLiveTranscript, setStatusMsg]
+  );
+
+  const handleFinalTranscriptError = useCallback((message: string) => {
+    setStatusMsg(
+      `Final transcription failed. You can still analyze the current text. ${message}`
+    );
+  }, [setStatusMsg]);
+
   const handleStatusChange = useCallback((recording: boolean) => {
     setIsRecording(recording);
     if (recording) {
+      setFinalTranscript("");
+      setProvisionalTranscript("");
+      setFinalizingTranscript(false);
+      setUserEditedTranscript(false);
       recordingSessionFullTranscriptRef.current = "";
+      finalTranscriptRef.current = "";
+      provisionalTranscriptRef.current = "";
+      userEditedTranscriptRef.current = false;
       lastAutoBatchIndexRef.current = 0;
       pendingAutoTranscriptRef.current = "";
       autoBatchQueueRef.current = [];
@@ -362,6 +421,9 @@ export default function Landing() {
         recordingBaseTranscriptRef.current = liveTranscriptRef.current.trim();
         pendingAutoTranscriptRef.current = liveTranscriptRef.current.trim();
       }
+    } else {
+      setFinalizingTranscript(true);
+      setStatusMsg("Finalizing transcript...");
     }
   }, [setElapsedSec, setIsRecording, setLiveTranscript, setMistakes, setStatusMsg, setTranscriptAnalyzed, transcriptAnalyzed]);
 
@@ -460,14 +522,23 @@ export default function Landing() {
       setStatusMsg("Waiting for background analysis to finish...");
       return;
     }
-    const fullText = liveTranscript.trim();
-    if (!fullText) {
+    const editedText = liveTranscript.trim();
+    const hasEditedText = userEditedTranscript && editedText.length > 0;
+    const chosenTranscript = hasEditedText
+      ? editedText
+      : finalTranscript.trim() || provisionalTranscript.trim() || editedText;
+
+    if (finalizingTranscript && !hasEditedText) {
+      setStatusMsg("Finalizing transcript. Wait a moment or edit the text and analyze that version.");
+      return;
+    }
+    if (!chosenTranscript) {
       setStatusMsg("No transcript to analyze. Record something first.");
       return;
     }
 
     try {
-      const result = await analyzeTranscript(fullText);
+      const result = await analyzeTranscript(chosenTranscript);
       if (!result) {
         return;
       }
@@ -484,17 +555,24 @@ export default function Landing() {
   const handleReset = () => {
     recordingBaseTranscriptRef.current = "";
     recordingSessionFullTranscriptRef.current = "";
+    provisionalTranscriptRef.current = "";
+    finalTranscriptRef.current = "";
+    userEditedTranscriptRef.current = false;
     pendingAutoTranscriptRef.current = "";
     lastAutoBatchIndexRef.current = 0;
     autoBatchQueueRef.current = [];
     autoQueueRunningRef.current = false;
     setAutoQueueVersion((prev) => prev + 1);
     setLiveTranscript("");
+    setProvisionalTranscript("");
+    setFinalTranscript("");
     setTranscriptAnalyzed(false);
+    setUserEditedTranscript(false);
     setMistakes([]);
     setStatusMsg("");
     setElapsedSec(0);
     setAutoAnalyzing(false);
+    setFinalizingTranscript(false);
     setPendingOverrideSessionId(null);
     setPendingOverrideScope(null);
   };
@@ -689,7 +767,9 @@ export default function Landing() {
               <AudioRecorder
                 onChunk={handleChunk}
                 onStatusChange={handleStatusChange}
-                language={currentLanguageProfile.language_code}
+                onFinalTranscript={handleFinalTranscript}
+                onError={handleFinalTranscriptError}
+                onFinalizeStateChange={setFinalizingTranscript}
               />
               <div style={{ fontSize: 14, color: "#475569" }}>
                 Timer: <strong>{formatDuration(elapsedSec)}</strong>
@@ -697,10 +777,10 @@ export default function Landing() {
               {!isRecording && liveTranscript.length > 0 && (
                 <button
                   onClick={handleAnalyzeRecording}
-                  disabled={analyzing || autoAnalyzing}
-                  style={analyzing || autoAnalyzing ? btnDisabled : btnPrimary}
+                  disabled={analyzing || autoAnalyzing || (finalizingTranscript && !userEditedTranscript)}
+                  style={analyzing || autoAnalyzing || (finalizingTranscript && !userEditedTranscript) ? btnDisabled : btnPrimary}
                 >
-                  {analyzing || autoAnalyzing ? "Analyzing..." : "Analyze"}
+                  {analyzing || autoAnalyzing ? "Analyzing..." : finalizingTranscript && !userEditedTranscript ? "Finalizing..." : "Analyze"}
                 </button>
               )}
               {!isRecording && liveTranscript.length > 0 && (
@@ -726,12 +806,15 @@ export default function Landing() {
               onTranscriptChange={(value) => {
                 recordingBaseTranscriptRef.current = value.trim();
                 recordingSessionFullTranscriptRef.current = "";
+                finalTranscriptRef.current = "";
                 pendingAutoTranscriptRef.current = value.trim();
                 lastAutoBatchIndexRef.current = 0;
                 autoBatchQueueRef.current = [];
                 autoQueueRunningRef.current = false;
                 setAutoQueueVersion((prev) => prev + 1);
                 setLiveTranscript(value);
+                setFinalTranscript("");
+                setUserEditedTranscript(true);
                 setTranscriptAnalyzed(false);
                 setPendingOverrideSessionId(null);
                 setPendingOverrideScope(null);

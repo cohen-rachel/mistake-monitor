@@ -37,7 +37,7 @@ class WhisperLocalProvider(STTProvider):
     async def transcribe(
         self,
         audio_bytes: bytes,
-        language: str = "en",
+        language: str | None = None,
         filename: str | None = None,
         content_type: str | None = None,
     ) -> TranscriptResult:
@@ -46,7 +46,7 @@ class WhisperLocalProvider(STTProvider):
     async def transcribe_chunk(
         self,
         audio_bytes: bytes,
-        language: str = "en",
+        language: str | None = None,
         filename: str | None = None,
         content_type: str | None = None,
     ) -> TranscriptResult:
@@ -55,7 +55,7 @@ class WhisperLocalProvider(STTProvider):
     async def _run_whisper(
         self,
         audio_bytes: bytes,
-        language: str,
+        language: str | None,
         filename: str | None = None,
         content_type: str | None = None,
     ) -> TranscriptResult:
@@ -77,7 +77,7 @@ class WhisperLocalProvider(STTProvider):
     def _sync_transcribe(
         self,
         audio_bytes: bytes,
-        language: str,
+        language: str | None,
         filename: str | None = None,
         content_type: str | None = None,
     ) -> TranscriptResult:
@@ -117,7 +117,13 @@ class WhisperLocalProvider(STTProvider):
 
             text = " ".join(full_text_parts)
             avg_conf = sum(s.confidence for s in segments) / len(segments) if segments else 0.0
-            logger.info(f"STT Output (Language: {language}): \"{text}\" (Avg Confidence: {avg_conf:.2f})") # ADD THIS LINE
+            logger.info(
+                'STT Output (Language Hint: %s, Detected: %s): "%s" (Avg Confidence: %.2f)',
+                language,
+                getattr(info, "language", "unknown"),
+                text,
+                avg_conf,
+            )
             return TranscriptResult(text=text, segments=segments, average_confidence=avg_conf)
         except Exception as e:
             logger.error(f"faster-whisper transcription failed: {e}")
