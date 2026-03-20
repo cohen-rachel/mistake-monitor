@@ -103,12 +103,28 @@ export interface RecentMistakeItem {
   corrected_sentence?: string;
 }
 
+export interface SpeakingWinItem {
+  event_id: number;
+  memory_id: number;
+  created_at: string;
+  summary: string;
+  focus_label: string;
+  previous_bad_sentence?: string;
+  improved_sentence?: string;
+  previous_wrong_span?: string;
+  suggested_correction?: string;
+  reason?: string;
+  confidence?: number;
+}
+
 export interface InsightsResponse {
   top_mistakes: MistakeCountItem[];
   trends: TrendPoint[];
   recent_mistakes: RecentMistakeItem[];
   progress: ProgressPoint[];
   improvement_banners: string[];
+  latest_speaking_win?: SpeakingWinItem | null;
+  speaking_win_history: SpeakingWinItem[];
 }
 
 export interface TopicItem {

@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { getInsights } from "../services/api";
 import TrendChart from "../components/TrendChart";
-import type { InsightsResponse } from "../types";
+import type { InsightsResponse, SpeakingWinItem } from "../types";
 import {
   BarChart,
   Bar,
@@ -14,6 +14,7 @@ import {
   Line,
 } from "recharts";
 import { useLanguageContext } from "../contexts/LanguageContext";
+
 const cardStyle: React.CSSProperties = {
   background: "#fff",
   border: "1px solid #e2e8f0",
@@ -23,19 +24,66 @@ const cardStyle: React.CSSProperties = {
   minWidth: 120,
 };
 
+const speakingWinDetailStyle: React.CSSProperties = {
+  marginTop: 12,
+  background: "#fff",
+  border: "1px solid #d1fae5",
+  borderRadius: 8,
+  padding: 16,
+};
+
+function SpeakingWinDetails({ win }: { win: SpeakingWinItem }) {
+  return (
+    <div style={speakingWinDetailStyle}>
+      <div style={{ fontSize: 13, color: "#475569", marginBottom: 8 }}>
+        Focus area: <strong>{win.focus_label}</strong>
+      </div>
+      <div style={{ fontSize: 13, color: "#64748b", marginBottom: 16 }}>{win.created_at}</div>
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: "#991b1b", marginBottom: 4 }}>
+          Earlier problematic transcript
+        </div>
+        <div style={{ color: "#334155", lineHeight: 1.7 }}>
+          {win.previous_bad_sentence || "No earlier transcript captured."}
+        </div>
+      </div>
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: "#166534", marginBottom: 4 }}>
+          Improved transcript
+        </div>
+        <div style={{ color: "#334155", lineHeight: 1.7 }}>
+          {win.improved_sentence || "No improved transcript captured."}
+        </div>
+      </div>
+      {win.reason ? (
+        <div style={{ fontSize: 13, color: "#475569", marginBottom: 12 }}>{win.reason}</div>
+      ) : null}
+      {win.previous_wrong_span || win.suggested_correction ? (
+        <div style={{ fontSize: 13, color: "#475569" }}>
+          {win.previous_wrong_span ? (
+            <span>
+              Earlier issue: <strong>{win.previous_wrong_span}</strong>
+            </span>
+          ) : null}
+          {win.previous_wrong_span && win.suggested_correction ? " -> " : ""}
+          {win.suggested_correction ? (
+            <span>
+              Suggested fix: <strong>{win.suggested_correction}</strong>
+            </span>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export default function Insights() {
   const { currentLanguageProfile, isLoadingLanguage } = useLanguageContext();
   const [data, setData] = useState<InsightsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [hoveredCode, setHoveredCode] = useState<string | null>(null);
-  // const [language, setLanguage] = useState("en");
+  const [selectedSpeakingWinId, setSelectedSpeakingWinId] = useState<number | null>(null);
 
-  // useEffect(() => {
-  //   getInsights(10, 30, language)
-  //     .then(setData)
-  //     .catch(console.error)
-  //     .finally(() => setLoading(false));
-  // }, [language]);
   useEffect(() => {
     if (!currentLanguageProfile) {
       if (!isLoadingLanguage) setLoading(false);
@@ -43,12 +91,31 @@ export default function Insights() {
     }
 
     setLoading(true);
-    console.log("currentLanguageProfile", currentLanguageProfile);
     getInsights(10, 30, currentLanguageProfile.id)
       .then(setData)
       .catch(console.error)
       .finally(() => setLoading(false));
   }, [currentLanguageProfile, isLoadingLanguage]);
+
+  useEffect(() => {
+    if (!data?.latest_speaking_win) {
+      setSelectedSpeakingWinId(null);
+      return;
+    }
+    setSelectedSpeakingWinId((prev) => prev ?? null);
+  }, [data]);
+
+  const previousSpeakingWins = useMemo(() => {
+    if (!data) {
+      return [];
+    }
+    if (!data.latest_speaking_win) {
+      return data.speaking_win_history;
+    }
+    return data.speaking_win_history.filter(
+      (item) => item.event_id !== data.latest_speaking_win?.event_id
+    );
+  }, [data]);
 
   if (loading) {
     return <p style={{ color: "#94a3b8", textAlign: "center" }}>Loading...</p>;
@@ -74,46 +141,71 @@ export default function Insights() {
       <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 16 }}>
         Insights
       </h1>
-      {/* <div style={{ marginBottom: 12 }}>
-        <label style={{ fontSize: 14, color: "#475569", marginRight: 8 }}>Language:</label>
-        <select
-          value={language}
-          onChange={(e) => setLanguage(e.target.value)}
-          style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid #cbd5e1" }}
-        >
-          <option value="en">English</option>
-          <option value="es">Spanish</option>
-          <option value="fr">French</option>
-          <option value="ja">Japanese</option>
-          <option value="de">German</option>
-          <option value="it">Italian</option>
-          <option value="pt">Portuguese</option>
-        </select>
-      </div> */}
 
-      {data.improvement_banners.length > 0 && (
+      {data.latest_speaking_win && (
         <div style={{ marginBottom: 18 }}>
-          {data.improvement_banners.map((banner, idx) => (
-            <div
-              key={idx}
-              style={{
-                background: "#ecfdf5",
-                border: "1px solid #86efac",
-                color: "#166534",
-                borderRadius: 8,
-                padding: "10px 12px",
-                marginBottom: 8,
-                fontSize: 14,
-                fontWeight: 600,
-              }}
-            >
-              {banner}
-            </div>
-          ))}
+          <button
+            type="button"
+            onClick={() =>
+              setSelectedSpeakingWinId((prev) =>
+                prev === data.latest_speaking_win?.event_id ? null : data.latest_speaking_win?.event_id ?? null
+              )
+            }
+            style={{
+              width: "100%",
+              textAlign: "left",
+              background: "#ecfdf5",
+              border: "1px solid #86efac",
+              color: "#166534",
+              borderRadius: 8,
+              padding: "10px 12px",
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+          >
+            {data.latest_speaking_win.summary}
+          </button>
+          {selectedSpeakingWinId === data.latest_speaking_win.event_id ? (
+            <SpeakingWinDetails win={data.latest_speaking_win} />
+          ) : null}
         </div>
       )}
 
-      {/* Top Mistakes */}
+      {previousSpeakingWins.length > 0 && (
+        <details style={{ marginBottom: 24 }}>
+          <summary style={{ cursor: "pointer", fontWeight: 600, color: "#334155" }}>
+            Previous speaking wins ({previousSpeakingWins.length})
+          </summary>
+          <div style={{ marginTop: 12, display: "grid", gap: 8 }}>
+            {previousSpeakingWins.map((win) => (
+              <div key={win.event_id}>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setSelectedSpeakingWinId((prev) => (prev === win.event_id ? null : win.event_id))
+                  }
+                  style={{
+                    width: "100%",
+                    textAlign: "left",
+                    background: "#f8fafc",
+                    border: "1px solid #e2e8f0",
+                    borderRadius: 8,
+                    padding: "10px 12px",
+                    cursor: "pointer",
+                    color: "#334155",
+                  }}
+                >
+                  <div style={{ fontWeight: 600 }}>{win.summary}</div>
+                  <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>{win.created_at}</div>
+                </button>
+                {selectedSpeakingWinId === win.event_id ? <SpeakingWinDetails win={win} /> : null}
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
+
       <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 12 }}>
         Top Mistake Types
       </h2>
@@ -186,7 +278,6 @@ export default function Insights() {
         </div>
       )}
 
-      {/* Trend Chart */}
       <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 12 }}>
         Error Trends Over Sessions
       </h2>
@@ -245,7 +336,6 @@ export default function Insights() {
           </LineChart>
         </ResponsiveContainer>
       </div>
-
     </div>
   );
 }

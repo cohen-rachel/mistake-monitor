@@ -20,6 +20,7 @@ from app.schemas import (
     TrendPoint,
     RecentMistakeItem,
     ProgressPoint,
+    SpeakingWinItem,
 )
 
 router = APIRouter(prefix="/api/insights", tags=["insights"])
@@ -57,6 +58,63 @@ def _build_corrected_sentence(
     if suggested_correction:
         return f"{original_sentence} [{suggested_correction}]"
     return original_sentence
+
+
+_GENERIC_SKILL_FAMILIES = {
+    "tense_aspect_usage",
+    "subject_verb_agreement",
+    "article_usage",
+    "preposition_usage",
+    "general_grammar",
+    "other",
+    "verb-tense",
+    "preposition",
+    "article",
+    "word-order",
+    "pronunciation",
+    "false-friend",
+    "pronoun",
+    "pluralization",
+    "vocabulary",
+    "subject-verb-agreement",
+    "verb conjugation and tense/aspect",
+    "verb usage",
+}
+
+
+def _humanize_focus_label(value: str | None) -> str:
+    if not value:
+        return "grammar"
+    cleaned = value.split(":", 1)[0].strip().strip("_-")
+    cleaned = cleaned.replace("_", " ").replace("-", " ")
+    cleaned = " ".join(cleaned.split())
+    return cleaned or "grammar"
+
+
+def _is_generic_focus_value(value: str | None) -> bool:
+    if not value:
+        return True
+    normalized = value.strip().lower()
+    return normalized in _GENERIC_SKILL_FAMILIES
+
+
+def _speaking_win_focus_label(memory: MistakeMemory, mistake_type_label: str | None) -> str:
+    pattern_label = (memory.pattern_label or "").strip()
+    if pattern_label and ":" not in pattern_label and not _is_generic_focus_value(pattern_label):
+        return _humanize_focus_label(pattern_label)
+
+    skill_family = (memory.skill_family or "").strip()
+    if skill_family and not _is_generic_focus_value(skill_family):
+        return _humanize_focus_label(skill_family)
+
+    if mistake_type_label:
+        return _humanize_focus_label(mistake_type_label)
+
+    return "grammar"
+
+
+def _speaking_win_summary(focus_label: str) -> str:
+    return f"Speaking win: You showed improvement in {focus_label}."
 
 
 @router.get("", response_model=InsightsResponse)
@@ -209,34 +267,51 @@ async def get_insights(
             )
         )
 
-    # 5. Improvement banners from speaking-based improvement wins.
+    # 5. Speaking-win details from speaking-based improvement wins.
     improvement_banners: list[str] = []
+    speaking_win_history: list[SpeakingWinItem] = []
     improvement_query = (
-        select(ImprovementEvent, MistakeMemory)
+        select(ImprovementEvent, MistakeMemory, Mistake, MistakeType, Transcript)
         .join(MistakeMemory, MistakeMemory.id == ImprovementEvent.memory_id)
+        .join(Mistake, Mistake.id == MistakeMemory.source_mistake_id)
+        .join(MistakeType, MistakeType.id == Mistake.mistake_type_id)
+        .join(Session, Session.id == Mistake.session_id)
+        .join(Transcript, Transcript.session_id == Session.id)
         .where(
             ImprovementEvent.language_profile_id == language_profile_id,
             ImprovementEvent.event_type == "win",
         )
         .order_by(ImprovementEvent.created_at.desc())
-        .limit(20)
+        .limit(50)
     )
     improvement_result = await db.execute(improvement_query)
-    seen_memory_ids: set[int] = set()
-    for event, memory in improvement_result.all():
-        if memory.id in seen_memory_ids:
-            continue
-        seen_memory_ids.add(memory.id)
-        if memory.correct_form:
-            improvement_banners.append(
-                f"Speaking win: You previously struggled with '{memory.wrong_form or memory.pattern_label}', and now used '{memory.correct_form}' correctly in speech."
+    for event, memory, source_mistake, mistake_type, source_transcript in improvement_result.all():
+        focus_label = _speaking_win_focus_label(memory, mistake_type.label if mistake_type else None)
+        summary = _speaking_win_summary(focus_label)
+        previous_bad_sentence = _extract_sentence(
+            source_transcript.raw_text or "",
+            source_mistake.start_char,
+            source_mistake.end_char,
+        )
+        speaking_win_history.append(
+            SpeakingWinItem(
+                event_id=event.id,
+                memory_id=memory.id,
+                created_at=event.created_at.strftime("%Y-%m-%d %H:%M") if event.created_at else "",
+                summary=summary,
+                focus_label=focus_label,
+                previous_bad_sentence=previous_bad_sentence,
+                improved_sentence=event.sentence_text,
+                previous_wrong_span=source_mistake.transcript_span,
+                suggested_correction=source_mistake.suggested_correction,
+                reason=event.reason,
+                confidence=event.confidence,
             )
-        else:
-            improvement_banners.append(
-                f"Speaking win: You showed improvement in '{memory.skill_family}' during speaking practice."
-            )
-        if len(improvement_banners) >= 3:
-            break
+        )
+
+    latest_speaking_win = speaking_win_history[0] if speaking_win_history else None
+    if latest_speaking_win is not None:
+        improvement_banners.append(latest_speaking_win.summary)
 
     return InsightsResponse(
         top_mistakes=top_mistakes,
@@ -244,4 +319,6 @@ async def get_insights(
         recent_mistakes=recent_mistakes,
         progress=progress,
         improvement_banners=improvement_banners,
+        latest_speaking_win=latest_speaking_win,
+        speaking_win_history=speaking_win_history,
     )

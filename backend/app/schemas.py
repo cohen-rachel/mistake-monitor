@@ -198,12 +198,28 @@ class RecentMistakeItem(BaseModel):
     corrected_sentence: Optional[str] = None
 
 
+class SpeakingWinItem(BaseModel):
+    event_id: int
+    memory_id: int
+    created_at: str
+    summary: str
+    focus_label: str
+    previous_bad_sentence: Optional[str] = None
+    improved_sentence: Optional[str] = None
+    previous_wrong_span: Optional[str] = None
+    suggested_correction: Optional[str] = None
+    reason: Optional[str] = None
+    confidence: Optional[float] = None
+
+
 class InsightsResponse(BaseModel):
     top_mistakes: list[MistakeCountItem]
     trends: list[TrendPoint]
     recent_mistakes: list[RecentMistakeItem]
     progress: list[ProgressPoint]
     improvement_banners: list[str]
+    latest_speaking_win: Optional[SpeakingWinItem] = None
+    speaking_win_history: list[SpeakingWinItem] = []
 
 
 # ---------- Practice ----------

@@ -1,5 +1,5 @@
 import React, { memo, useEffect, useMemo, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import Screen from "../components/Screen";
 import SectionCard from "../components/SectionCard";
 import VerticalBarChart from "../components/VerticalBarChart";
@@ -8,14 +8,42 @@ import TimeSeriesChart from "../components/TimeSeriesChart";
 import { getInsights } from "../services/api";
 import { useLanguageContext } from "../contexts/LanguageContext";
 import { useLandingState } from "../contexts/LandingStateContext";
-import type { InsightsResponse } from "../types";
+import type { InsightsResponse, SpeakingWinItem } from "../types";
 import { colors } from "../theme";
+
+function SpeakingWinDetails({ win }: { win: SpeakingWinItem }) {
+  return (
+    <View style={styles.detailCard}>
+      <Text style={styles.metaLabel}>
+        Focus area: <Text style={styles.metaValue}>{win.focus_label}</Text>
+      </Text>
+      <Text style={styles.metaDate}>{win.created_at}</Text>
+      <Text style={styles.detailHeadingBad}>Earlier problematic transcript</Text>
+      <Text style={styles.detailText}>
+        {win.previous_bad_sentence || "No earlier transcript captured."}
+      </Text>
+      <Text style={styles.detailHeadingGood}>Improved transcript</Text>
+      <Text style={styles.detailText}>
+        {win.improved_sentence || "No improved transcript captured."}
+      </Text>
+      {win.reason ? <Text style={styles.recentMeta}>{win.reason}</Text> : null}
+      {win.previous_wrong_span || win.suggested_correction ? (
+        <Text style={styles.metaLabel}>
+          Earlier issue: <Text style={styles.metaValue}>{win.previous_wrong_span || "Unknown"}</Text>
+          {win.suggested_correction ? ` -> Suggested fix: ${win.suggested_correction}` : ""}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
 
 function InsightsScreen() {
   const { currentLanguageProfile, isLoadingLanguage } = useLanguageContext();
   const { dataRefreshVersion } = useLandingState();
   const [data, setData] = useState<InsightsResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [winsExpanded, setWinsExpanded] = useState(false);
+  const [selectedSpeakingWinId, setSelectedSpeakingWinId] = useState<number | null>(null);
 
   useEffect(() => {
     if (!currentLanguageProfile) {
@@ -30,6 +58,26 @@ function InsightsScreen() {
       .catch(() => setData(null))
       .finally(() => setLoading(false));
   }, [currentLanguageProfile, isLoadingLanguage, dataRefreshVersion]);
+
+  useEffect(() => {
+    if (!data?.latest_speaking_win) {
+      setSelectedSpeakingWinId(null);
+      return;
+    }
+    setSelectedSpeakingWinId((prev) => prev ?? null);
+  }, [data]);
+
+  const previousSpeakingWins = useMemo(() => {
+    if (!data) {
+      return [];
+    }
+    if (!data.latest_speaking_win) {
+      return data.speaking_win_history;
+    }
+    return data.speaking_win_history.filter(
+      (item) => item.event_id !== data.latest_speaking_win?.event_id
+    );
+  }, [data]);
 
   const topMistakeItems = useMemo(
     () =>
@@ -103,14 +151,52 @@ function InsightsScreen() {
         </SectionCard>
       ) : (
         <>
-          {data.improvement_banners.length > 0 ? (
+          {data.latest_speaking_win ? (
             <View style={styles.bannerList}>
-              {data.improvement_banners.map((banner, index) => (
-                <View key={`${banner}-${index}`} style={styles.banner}>
-                  <Text style={styles.bannerText}>{banner}</Text>
-                </View>
-              ))}
+              <Pressable
+                onPress={() =>
+                  setSelectedSpeakingWinId((prev) =>
+                    prev === data.latest_speaking_win?.event_id ? null : data.latest_speaking_win?.event_id ?? null
+                  )
+                }
+                style={styles.banner}
+              >
+                <Text style={styles.bannerText}>{data.latest_speaking_win.summary}</Text>
+              </Pressable>
+              {selectedSpeakingWinId === data.latest_speaking_win.event_id ? (
+                <SpeakingWinDetails win={data.latest_speaking_win} />
+              ) : null}
             </View>
+          ) : null}
+
+          {previousSpeakingWins.length > 0 ? (
+            <SectionCard>
+              <Pressable
+                onPress={() => setWinsExpanded((prev) => !prev)}
+                style={styles.expandHeader}
+              >
+                <Text style={styles.sectionTitle}>
+                  Previous Speaking Wins ({previousSpeakingWins.length})
+                </Text>
+                <Text style={styles.expandToggle}>{winsExpanded ? "Hide" : "Show"}</Text>
+              </Pressable>
+              {winsExpanded
+                ? previousSpeakingWins.map((win) => (
+                    <View key={win.event_id}>
+                      <Pressable
+                        onPress={() =>
+                          setSelectedSpeakingWinId((prev) => (prev === win.event_id ? null : win.event_id))
+                        }
+                        style={styles.winRow}
+                      >
+                        <Text style={styles.winSummary}>{win.summary}</Text>
+                        <Text style={styles.winDate}>{win.created_at}</Text>
+                      </Pressable>
+                      {selectedSpeakingWinId === win.event_id ? <SpeakingWinDetails win={win} /> : null}
+                    </View>
+                  ))
+                : null}
+            </SectionCard>
           ) : null}
 
           <SectionCard>
@@ -190,12 +276,6 @@ const styles = StyleSheet.create({
     color: colors.textSoft,
     fontSize: 14,
   },
-  note: {
-    color: colors.textSoft,
-    fontSize: 13,
-    lineHeight: 20,
-    marginBottom: 10,
-  },
   bannerList: {
     gap: 8,
     marginBottom: 16,
@@ -211,6 +291,69 @@ const styles = StyleSheet.create({
     color: "#166534",
     fontWeight: "700",
     fontSize: 14,
+  },
+  detailCard: {
+    marginTop: 12,
+    backgroundColor: colors.surface,
+    borderColor: "#d1fae5",
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+  },
+  metaLabel: {
+    color: colors.textMuted,
+    fontSize: 13,
+    marginBottom: 6,
+  },
+  metaValue: {
+    color: colors.text,
+    fontWeight: "700",
+  },
+  metaDate: {
+    color: colors.textSoft,
+    fontSize: 12,
+    marginBottom: 14,
+  },
+  detailHeadingBad: {
+    color: "#991b1b",
+    fontSize: 12,
+    fontWeight: "800",
+    marginBottom: 4,
+  },
+  detailHeadingGood: {
+    color: "#166534",
+    fontSize: 12,
+    fontWeight: "800",
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  detailText: {
+    color: colors.text,
+    lineHeight: 22,
+  },
+  expandHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  expandToggle: {
+    color: colors.textSoft,
+    fontWeight: "700",
+  },
+  winRow: {
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  winSummary: {
+    color: colors.text,
+    fontWeight: "700",
+    marginBottom: 4,
+  },
+  winDate: {
+    color: colors.textSoft,
+    fontSize: 12,
   },
   recentRow: {
     paddingVertical: 10,
