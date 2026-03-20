@@ -5,7 +5,8 @@ import json
 import logging
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, UploadFile, File, Form
 
-from app.schemas import FinalTranscriptionOut
+from app.config import settings
+from app.schemas import FinalTranscriptionOut, TranscriptionConfigOut
 from app.services.stt.factory import get_final_stt_provider, get_live_stt_provider
 
 logger = logging.getLogger(__name__)
@@ -95,6 +96,17 @@ async def finalize_recorded_audio(
         transcript_source="final_file_stt",
         average_confidence=result.average_confidence,
         segments=segments,
+    )
+
+
+@router.get("/config", response_model=TranscriptionConfigOut)
+async def get_transcription_config():
+    live_provider = (settings.live_stt_provider or settings.stt_provider).lower()
+    final_provider = (settings.final_stt_provider or settings.stt_provider).lower()
+    return TranscriptionConfigOut(
+        live_stt_provider=live_provider,
+        final_stt_provider=final_provider,
+        skip_final_pass=live_provider == "whisper_local" and final_provider == "whisper_local",
     )
 
 

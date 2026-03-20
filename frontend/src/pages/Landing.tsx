@@ -366,6 +366,21 @@ export default function Landing() {
 
   const handleFinalTranscript = useCallback(
     (analysisText: string, displayText: string) => {
+      if (!analysisText.trim() && !displayText.trim()) {
+        const authoritativeText =
+          provisionalTranscriptRef.current.trim() || liveTranscriptRef.current.trim();
+        setFinalTranscript(authoritativeText);
+        if (!userEditedTranscriptRef.current) {
+          setLiveTranscript(authoritativeText);
+          setStatusMsg("Live transcript ready.");
+        } else {
+          setStatusMsg(
+            "Using the live transcript. Your manual edits are preserved and will be used for analysis."
+          );
+        }
+        return;
+      }
+
       const mergedAnalysisText = [recordingBaseTranscriptRef.current, analysisText.trim()]
         .filter(Boolean)
         .join(" ")
@@ -767,6 +782,7 @@ export default function Landing() {
               <AudioRecorder
                 onChunk={handleChunk}
                 onStatusChange={handleStatusChange}
+                language={currentLanguageProfile.language_code}
                 onFinalTranscript={handleFinalTranscript}
                 onError={handleFinalTranscriptError}
                 onFinalizeStateChange={setFinalizingTranscript}

@@ -110,6 +110,12 @@ class FinalTranscriptionOut(BaseModel):
     segments: list[dict] = []
 
 
+class TranscriptionConfigOut(BaseModel):
+    live_stt_provider: str
+    final_stt_provider: str
+    skip_final_pass: bool = False
+
+
 # ---------- Analysis ----------
 class AnalyzeRequest(BaseModel):
     session_id: int

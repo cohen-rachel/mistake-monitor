@@ -15,6 +15,7 @@ import type {
   RewriteExerciseResponse,
   RewriteStatsResponse,
   RewriteSubmitResponse,
+  TranscriptionConfigResponse,
 } from "../types";
 import type { UserLanguageProfileOut } from "../types";
 
@@ -92,14 +93,22 @@ export async function createSessionWithAudio(
 }
 
 export async function finalizeRecordedAudio(
-  audioFile: File
+  audioFile: File,
+  language?: string
 ): Promise<FinalTranscriptionResponse> {
   const form = new FormData();
   form.append("audio_file", audioFile);
+  if (language) {
+    form.append("language", language);
+  }
   return request<FinalTranscriptionResponse>("/transcribe/finalize", {
     method: "POST",
     body: form,
   });
+}
+
+export async function getTranscriptionConfig(): Promise<TranscriptionConfigResponse> {
+  return request<TranscriptionConfigResponse>("/transcribe/config");
 }
 
 export async function listSessions(

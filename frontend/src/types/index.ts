@@ -217,6 +217,12 @@ export interface FinalTranscriptionResponse {
   }>;
 }
 
+export interface TranscriptionConfigResponse {
+  live_stt_provider: string;
+  final_stt_provider: string;
+  skip_final_pass: boolean;
+}
+
 export interface UserLanguageProfileOut {
   id: number;
   user_id: number;

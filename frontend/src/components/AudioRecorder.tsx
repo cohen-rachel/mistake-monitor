@@ -1,10 +1,15 @@
 import { useRef, useState, useCallback } from "react";
-import { createTranscribeSocket, finalizeRecordedAudio } from "../services/api";
+import {
+  createTranscribeSocket,
+  finalizeRecordedAudio,
+  getTranscriptionConfig,
+} from "../services/api";
 import type { TranscriptChunk } from "../types";
 
 interface Props {
   onChunk: (text: string, fullText?: string) => void;
   onStatusChange: (recording: boolean) => void;
+  language?: string;
   onFinalTranscript?: (analysisText: string, displayText: string) => void;
   onError?: (message: string) => void;
   onFinalizeStateChange?: (finalizing: boolean) => void;
@@ -23,6 +28,7 @@ const btnBase: React.CSSProperties = {
 export default function AudioRecorder({
   onChunk,
   onStatusChange,
+  language,
   onFinalTranscript,
   onError,
   onFinalizeStateChange,
@@ -32,6 +38,7 @@ export default function AudioRecorder({
   const wsRef = useRef<WebSocket | null>(null);
   const chunksRef = useRef<BlobPart[]>([]);
   const mimeTypeRef = useRef<string>("audio/webm");
+  const skipFinalPassRef = useRef(false);
 
   const stopRecording = useCallback(() => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
@@ -52,6 +59,12 @@ export default function AudioRecorder({
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       chunksRef.current = [];
+      try {
+        const config = await getTranscriptionConfig();
+        skipFinalPassRef.current = config.skip_final_pass;
+      } catch {
+        skipFinalPassRef.current = false;
+      }
 
       const ws = createTranscribeSocket();
       wsRef.current = ws;
@@ -97,6 +110,11 @@ export default function AudioRecorder({
           type: mimeTypeRef.current || "audio/webm",
         });
         chunksRef.current = [];
+        if (skipFinalPassRef.current) {
+          onFinalTranscript?.("", "");
+          onFinalizeStateChange?.(false);
+          return;
+        }
         if (!blob.size) {
           onFinalizeStateChange?.(false);
           return;
@@ -107,7 +125,7 @@ export default function AudioRecorder({
           const file = new File([blob], `recording.${extension}`, {
             type: mimeTypeRef.current || "audio/webm",
           });
-          const result = await finalizeRecordedAudio(file);
+          const result = await finalizeRecordedAudio(file, language);
           onFinalTranscript?.(result.analysis_text, result.display_text);
         } catch (err) {
           const message =
@@ -125,7 +143,7 @@ export default function AudioRecorder({
       console.error("Microphone access denied or unavailable:", err);
       alert("Could not access microphone. Please allow microphone access.");
     }
-  }, [onChunk, onError, onFinalTranscript, onFinalizeStateChange, onStatusChange]);
+  }, [language, onChunk, onError, onFinalTranscript, onFinalizeStateChange, onStatusChange]);
 
   return (
     <button
