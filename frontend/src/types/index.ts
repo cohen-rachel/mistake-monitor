@@ -44,6 +44,9 @@ export interface SessionOut {
   stt_provider?: string;
   stt_confidence_summary?: number;
   status: string;
+  mistake_count: number;
+  primary_focus_label?: string;
+  focus_labels: string[];
 }
 
 export interface PracticeSelection {

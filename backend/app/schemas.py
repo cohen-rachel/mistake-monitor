@@ -88,6 +88,9 @@ class SessionOut(BaseModel):
     stt_provider: Optional[str] = None
     stt_confidence_summary: Optional[float] = None
     status: str
+    mistake_count: int = 0
+    primary_focus_label: Optional[str] = None
+    focus_labels: list[str] = []
 
     model_config = {"from_attributes": True}
 

@@ -23,6 +23,27 @@ from app.services.analysis import analyze_transcript
 
 router = APIRouter(prefix="/api/sessions", tags=["sessions"])
 
+_GENERIC_SKILL_FAMILIES = {
+    "tense_aspect_usage",
+    "subject_verb_agreement",
+    "article_usage",
+    "preposition_usage",
+    "general_grammar",
+    "other",
+    "verb-tense",
+    "preposition",
+    "article",
+    "word-order",
+    "pronunciation",
+    "false-friend",
+    "pronoun",
+    "pluralization",
+    "vocabulary",
+    "subject-verb-agreement",
+    "verb conjugation and tense/aspect",
+    "verb usage",
+}
+
 
 def _language_display_name(language: str) -> str:
     names = {
@@ -35,6 +56,56 @@ def _language_display_name(language: str) -> str:
         "pt": "Portuguese",
     }
     return names.get(language, language.upper())
+
+
+def _humanize_focus_label(value: str | None) -> str:
+    if not value:
+        return "grammar"
+    cleaned = value.split(":", 1)[0].strip().strip("_-")
+    cleaned = cleaned.replace("_", " ").replace("-", " ")
+    cleaned = " ".join(cleaned.split())
+    return cleaned or "grammar"
+
+
+def _is_generic_focus_value(value: str | None) -> bool:
+    if not value:
+        return True
+    return value.strip().lower() in _GENERIC_SKILL_FAMILIES
+
+
+def _mistake_focus_label(mistake: Mistake) -> str | None:
+    pattern_label = (mistake.pattern_label or "").strip()
+    if pattern_label and ":" not in pattern_label and not _is_generic_focus_value(pattern_label):
+        return _humanize_focus_label(pattern_label)
+
+    skill_family = (mistake.skill_family or "").strip()
+    if skill_family and not _is_generic_focus_value(skill_family):
+        return _humanize_focus_label(skill_family)
+
+    if mistake.mistake_type and mistake.mistake_type.label:
+        return _humanize_focus_label(mistake.mistake_type.label)
+
+    return None
+
+
+def _session_focus_summary(session: Session) -> tuple[int, str | None, list[str]]:
+    if not session.mistakes:
+        return 0, None, []
+
+    counts: dict[str, int] = {}
+    for mistake in session.mistakes:
+        label = _mistake_focus_label(mistake)
+        if not label:
+            continue
+        counts[label] = counts.get(label, 0) + 1
+
+    if not counts:
+        return len(session.mistakes), None, []
+
+    ordered_labels = [
+        label for label, _ in sorted(counts.items(), key=lambda item: (-item[1], item[0]))
+    ]
+    return len(session.mistakes), ordered_labels[0], ordered_labels
 
 
 async def _load_session_detail(db: AsyncSession, session_id: int) -> Session:
@@ -182,7 +253,9 @@ async def list_sessions(
     db: AsyncSession = Depends(get_db),
 ):
     """List all sessions for a given language profile, most recent first."""
-    stmt = select(Session)
+    stmt = select(Session).options(
+        selectinload(Session.mistakes).selectinload(Mistake.mistake_type)
+    )
     if language_profile_id:
         stmt = stmt.join(SessionLanguageProfile).where(
             SessionLanguageProfile.language_profile_id == language_profile_id
@@ -190,7 +263,25 @@ async def list_sessions(
     stmt = stmt.order_by(Session.created_at.desc())
     result = await db.execute(stmt)
     sessions = result.scalars().all()
-    return SessionListOut(sessions=sessions)
+    session_items = []
+    for session in sessions:
+        mistake_count, primary_focus_label, focus_labels = _session_focus_summary(session)
+        session_items.append(
+            SessionOut(
+                id=session.id,
+                user_id=session.user_id,
+                created_at=session.created_at,
+                language=session.language,
+                audio_meta=session.audio_meta,
+                stt_provider=session.stt_provider,
+                stt_confidence_summary=session.stt_confidence_summary,
+                status=session.status,
+                mistake_count=mistake_count,
+                primary_focus_label=primary_focus_label,
+                focus_labels=focus_labels,
+            )
+        )
+    return SessionListOut(sessions=session_items)
 
 
 @router.get("/{session_id}", response_model=SessionDetailOut)
