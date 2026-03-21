@@ -124,6 +124,7 @@ export interface SpeakingWinItem {
 
 export interface InsightsResponse {
   top_mistakes: MistakeCountItem[];
+  common_patterns: MistakeCountItem[];
   trends: TrendPoint[];
   recent_mistakes: RecentMistakeItem[];
   progress: ProgressPoint[];

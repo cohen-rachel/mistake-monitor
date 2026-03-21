@@ -214,6 +214,7 @@ class SpeakingWinItem(BaseModel):
 
 class InsightsResponse(BaseModel):
     top_mistakes: list[MistakeCountItem]
+    common_patterns: list[MistakeCountItem]
     trends: list[TrendPoint]
     recent_mistakes: list[RecentMistakeItem]
     progress: list[ProgressPoint]

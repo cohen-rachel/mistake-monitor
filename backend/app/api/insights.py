@@ -114,7 +114,41 @@ def _speaking_win_focus_label(memory: MistakeMemory, mistake_type_label: str | N
 
 
 def _speaking_win_summary(focus_label: str) -> str:
-    return f"Speaking win: You showed improvement in {focus_label}."
+    return f"You showed improvement in {focus_label}."
+
+
+def _specific_focus_label(
+    pattern_label: str | None,
+    skill_family: str | None,
+    mistake_type_label: str | None,
+) -> str:
+    pattern_value = (pattern_label or "").strip()
+    if pattern_value and ":" not in pattern_value and not _is_generic_focus_value(pattern_value):
+        return _humanize_focus_label(pattern_value)
+
+    skill_value = (skill_family or "").strip()
+    if skill_value and not _is_generic_focus_value(skill_value):
+        return _humanize_focus_label(skill_value)
+
+    if mistake_type_label:
+        return _humanize_focus_label(mistake_type_label)
+
+    return "grammar"
+
+
+def _specific_pattern_focus_label(
+    pattern_label: str | None,
+    skill_family: str | None,
+) -> str | None:
+    pattern_value = (pattern_label or "").strip()
+    if pattern_value and ":" not in pattern_value and not _is_generic_focus_value(pattern_value):
+        return _humanize_focus_label(pattern_value)
+
+    skill_value = (skill_family or "").strip()
+    if skill_value and not _is_generic_focus_value(skill_value):
+        return _humanize_focus_label(skill_value)
+
+    return None
 
 
 @router.get("", response_model=InsightsResponse)
@@ -148,16 +182,25 @@ async def get_insights(
     for row in top_rows:
         code, label, count = row[0], row[1], row[2]
         latest_query = (
-            select(Mistake.explanation_short)
+            select(Mistake, Transcript)
             .join(MistakeType, Mistake.mistake_type_id == MistakeType.id)
             .join(Session, Mistake.session_id == Session.id)
+            .join(Transcript, Transcript.session_id == Session.id)
             .join(SessionLanguageProfile, SessionLanguageProfile.session_id == Session.id)
             .where(MistakeType.code == code, SessionLanguageProfile.language_profile_id == language_profile_id)
             .order_by(Mistake.id.desc())
             .limit(1)
         )
         latest_result = await db.execute(latest_query)
-        latest_summary = latest_result.scalar_one_or_none()
+        latest_row = latest_result.first()
+        latest_summary = None
+        if latest_row:
+            latest_mistake, latest_transcript = latest_row
+            latest_summary = _extract_sentence(
+                latest_transcript.raw_text or "",
+                latest_mistake.start_char,
+                latest_mistake.end_char,
+            )
 
         description_query = select(MistakeType.description).where(MistakeType.code == code).limit(1)
         description_result = await db.execute(description_query)
@@ -172,6 +215,83 @@ async def get_insights(
                 recent_mistake_summary=latest_summary,
             )
         )
+
+    # 1b. More specific recurring error patterns, grouped by construction/focus area.
+    pattern_query = (
+        select(
+            Mistake.pattern_label,
+            Mistake.skill_family,
+            MistakeType.code,
+            MistakeType.label,
+            func.count(Mistake.id).label("cnt"),
+        )
+        .join(MistakeType, Mistake.mistake_type_id == MistakeType.id)
+        .join(Session, Mistake.session_id == Session.id)
+        .join(SessionLanguageProfile, SessionLanguageProfile.session_id == Session.id)
+        .where(SessionLanguageProfile.language_profile_id == language_profile_id)
+        .group_by(
+            Mistake.pattern_label,
+            Mistake.skill_family,
+            MistakeType.code,
+            MistakeType.label,
+        )
+    )
+    pattern_result = await db.execute(pattern_query)
+    pattern_groups: dict[str, dict] = {}
+    for pattern_label, skill_family, mistake_type_code, mistake_type_label, count in pattern_result.all():
+        focus_label = _specific_pattern_focus_label(pattern_label, skill_family)
+        if not focus_label:
+            continue
+        key = focus_label.lower()
+        existing = pattern_groups.get(key)
+        if existing is None:
+            pattern_groups[key] = {
+                "focus_label": focus_label,
+                "count": count,
+                "description": mistake_type_label,
+                "recent_mistake_summary": None,
+            }
+        else:
+            existing["count"] += count
+            if existing["description"] is None and mistake_type_label:
+                existing["description"] = mistake_type_label
+
+    pattern_example_query = (
+        select(Mistake, MistakeType, Transcript)
+        .join(MistakeType, Mistake.mistake_type_id == MistakeType.id)
+        .join(Session, Mistake.session_id == Session.id)
+        .join(Transcript, Transcript.session_id == Session.id)
+        .join(SessionLanguageProfile, SessionLanguageProfile.session_id == Session.id)
+        .where(SessionLanguageProfile.language_profile_id == language_profile_id)
+        .order_by(Mistake.id.desc())
+        .limit(500)
+    )
+    pattern_example_result = await db.execute(pattern_example_query)
+    for mistake, mistake_type, transcript in pattern_example_result.all():
+        focus_label = _specific_pattern_focus_label(mistake.pattern_label, mistake.skill_family)
+        if not focus_label:
+            continue
+        key = focus_label.lower()
+        group = pattern_groups.get(key)
+        if group is None or group["recent_mistake_summary"] is not None:
+            continue
+        group["recent_mistake_summary"] = _extract_sentence(
+            transcript.raw_text or "",
+            mistake.start_char,
+            mistake.end_char,
+        )
+
+    common_patterns = [
+        MistakeCountItem(
+            code=group["focus_label"].lower().replace(" ", "-"),
+            label=group["focus_label"],
+            count=group["count"],
+            description=group["description"],
+            recent_mistake_summary=group["recent_mistake_summary"],
+        )
+        for group in sorted(pattern_groups.values(), key=lambda item: (-item["count"], item["focus_label"]))
+        if group["count"] > 3
+    ][:top_k]
 
     # 2. Trend data: mistake count per session per type
     trend_query = (
@@ -315,6 +435,7 @@ async def get_insights(
 
     return InsightsResponse(
         top_mistakes=top_mistakes,
+        common_patterns=common_patterns,
         trends=trends,
         recent_mistakes=recent_mistakes,
         progress=progress,

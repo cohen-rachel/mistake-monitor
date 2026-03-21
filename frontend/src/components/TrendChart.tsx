@@ -1,13 +1,13 @@
 import {
-  LineChart,
-  Line,
+  BarChart,
+  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
   ResponsiveContainer,
 } from "recharts";
+import { useMemo, useState } from "react";
 import type { TrendPoint } from "../types";
 
 const COLORS = [
@@ -23,12 +23,133 @@ const COLORS = [
   "#6366f1",
 ];
 
+export type TrendRange = "7d" | "4w" | "1y" | "all";
+
 interface Props {
   trends: TrendPoint[];
+  range: TrendRange;
 }
 
-export default function TrendChart({ trends }: Props) {
-  if (trends.length === 0) {
+type ChartRow = {
+  bucketKey: string;
+  bucketDate: Date;
+  hoverLabel: string;
+  [key: string]: string | number | Date;
+};
+
+export function parseTrendDate(value: string): Date {
+  return new Date(value.replace(" ", "T"));
+}
+
+export function startOfTrendWeek(date: Date): Date {
+  const next = new Date(date);
+  const day = next.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  next.setDate(next.getDate() + diff);
+  next.setHours(0, 0, 0, 0);
+  return next;
+}
+
+export function formatAxisDate(date: Date): string {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+  }).format(date);
+}
+
+export function formatHoverDate(date: Date): string {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    day: "numeric",
+  }).format(date);
+}
+
+function humanizeCode(code: string): string {
+  return code
+    .replace(/-/g, " ")
+    .split(" ")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+export function cutoffForRange(range: TrendRange): Date | null {
+  const now = new Date();
+  const cutoff = new Date(now);
+  if (range === "7d") {
+    cutoff.setDate(now.getDate() - 7);
+    return cutoff;
+  }
+  if (range === "4w") {
+    cutoff.setDate(now.getDate() - 28);
+    return cutoff;
+  }
+  if (range === "1y") {
+    cutoff.setFullYear(now.getFullYear() - 1);
+    return cutoff;
+  }
+  return null;
+}
+
+export default function TrendChart({ trends, range }: Props) {
+  const [hiddenTypes, setHiddenTypes] = useState<string[]>([]);
+
+  const filteredTrends = useMemo(() => {
+    const cutoff = cutoffForRange(range);
+    return trends.filter((item) => {
+      if (!cutoff) {
+        return true;
+      }
+      return parseTrendDate(item.date) >= cutoff;
+    });
+  }, [range, trends]);
+
+  const { chartData, typeList, colorByCode } = useMemo(() => {
+    const allTypes = new Set<string>();
+    const grouped = new Map<string, ChartRow>();
+    const useWeeklyBuckets = range === "1y" || range === "all";
+
+    for (const point of filteredTrends) {
+      allTypes.add(point.mistake_type_code);
+      const pointDate = parseTrendDate(point.date);
+      const bucketDate = useWeeklyBuckets ? startOfTrendWeek(pointDate) : new Date(pointDate.getFullYear(), pointDate.getMonth(), pointDate.getDate());
+      const bucketKey = bucketDate.toISOString().slice(0, 10);
+      if (!grouped.has(bucketKey)) {
+        grouped.set(bucketKey, {
+          bucketKey,
+          bucketDate,
+          hoverLabel: formatHoverDate(bucketDate),
+        });
+      }
+      const row = grouped.get(bucketKey)!;
+      row[point.mistake_type_code] =
+        Number(row[point.mistake_type_code] || 0) + point.count;
+    }
+
+    const rows = Array.from(grouped.values()).sort(
+      (a, b) => a.bucketDate.getTime() - b.bucketDate.getTime()
+    );
+    const codes = Array.from(allTypes);
+    for (const row of rows) {
+      for (const code of codes) {
+        if (typeof row[code] !== "number") {
+          row[code] = 0;
+        }
+      }
+    }
+    return {
+      chartData: rows,
+      typeList: codes,
+      colorByCode: new Map(codes.map((code, index) => [code, COLORS[index % COLORS.length]])),
+    };
+  }, [filteredTrends, range]);
+
+  const visibleTypes = useMemo(
+    () => typeList.filter((code) => !hiddenTypes.includes(code)),
+    [hiddenTypes, typeList]
+  );
+
+  if (chartData.length === 0 || typeList.length === 0) {
     return (
       <div
         style={{
@@ -40,28 +161,19 @@ export default function TrendChart({ trends }: Props) {
           border: "1px solid #e2e8f0",
         }}
       >
-        No trend data yet. Analyze some sessions to see trends.
+        No trend data yet in this time range.
       </div>
     );
   }
 
-  // Pivot: group by session date, with one key per mistake_type_code
-  type ChartRow = { date: string; [key: string]: number | string };
-  const sessionMap = new Map<string, ChartRow>();
-  const allTypes = new Set<string>();
+  const firstTick = chartData[0]?.bucketKey;
+  const lastTick = chartData[chartData.length - 1]?.bucketKey;
 
-  for (const t of trends) {
-    allTypes.add(t.mistake_type_code);
-    const key = `${t.session_id}-${t.date}`;
-    if (!sessionMap.has(key)) {
-      sessionMap.set(key, { date: t.date });
-    }
-    const entry = sessionMap.get(key)!;
-    entry[t.mistake_type_code] = t.count;
-  }
-
-  const chartData = Array.from(sessionMap.values());
-  const typeList = Array.from(allTypes);
+  const toggleType = (code: string) => {
+    setHiddenTypes((prev) =>
+      prev.includes(code) ? prev.filter((item) => item !== code) : [...prev, code]
+    );
+  };
 
   return (
     <div
@@ -72,25 +184,75 @@ export default function TrendChart({ trends }: Props) {
         padding: 16,
       }}
     >
-      <ResponsiveContainer width="100%" height={300}>
-        <LineChart data={chartData}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-          <XAxis dataKey="date" fontSize={12} />
-          <YAxis fontSize={12} allowDecimals={false} />
-          <Tooltip />
-          <Legend />
-          {typeList.map((code, i) => (
-            <Line
+      <div
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          gap: 12,
+          marginBottom: 12,
+        }}
+      >
+        {typeList.map((code) => {
+          const isHidden = hiddenTypes.includes(code);
+          const color = colorByCode.get(code) || COLORS[0];
+          return (
+            <button
               key={code}
-              type="monotone"
+              type="button"
+              onClick={() => toggleType(code)}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
+                border: "none",
+                background: "transparent",
+                cursor: "pointer",
+                padding: 0,
+                color: isHidden ? "#94a3b8" : "#334155",
+                fontSize: 12,
+                fontWeight: 600,
+              }}
+            >
+              <span
+                style={{
+                  width: 10,
+                  height: 10,
+                  borderRadius: 999,
+                  background: color,
+                  opacity: isHidden ? 0.35 : 1,
+                }}
+              />
+              <span>{humanizeCode(code)}</span>
+            </button>
+          );
+        })}
+      </div>
+      <ResponsiveContainer width="100%" height={320}>
+        <BarChart data={chartData}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+          <XAxis
+            dataKey="bucketKey"
+            ticks={firstTick === lastTick ? [firstTick] : [firstTick, lastTick].filter(Boolean)}
+            tickFormatter={(value) => formatAxisDate(new Date(`${value}T00:00:00`))}
+            fontSize={12}
+          />
+          <YAxis fontSize={12} allowDecimals={false} />
+          <Tooltip
+            formatter={(value: number, name: string) => [value, humanizeCode(name)]}
+            labelFormatter={(_, payload) => {
+              const row = payload?.[0]?.payload as ChartRow | undefined;
+              return row?.hoverLabel || "";
+            }}
+          />
+          {visibleTypes.map((code) => (
+            <Bar
+              key={code}
               dataKey={code}
-              stroke={COLORS[i % COLORS.length]}
-              strokeWidth={2}
-              dot={{ r: 3 }}
-              connectNulls
+              stackId="errors"
+              fill={colorByCode.get(code) || COLORS[0]}
             />
           ))}
-        </LineChart>
+        </BarChart>
       </ResponsiveContainer>
     </div>
   );
