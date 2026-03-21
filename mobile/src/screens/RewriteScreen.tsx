@@ -28,6 +28,7 @@ function RewriteScreen() {
   const [loading, setLoading] = useState(false);
   const [seenMistakeIds, setSeenMistakeIds] = useState<number[]>([]);
   const [hasSubmitted, setHasSubmitted] = useState(false);
+  const [showExplanation, setShowExplanation] = useState(false);
 
   const loadStats = async () => {
     if (!currentLanguageProfile) {
@@ -54,6 +55,7 @@ function RewriteScreen() {
     setNoMistakesMessage(null);
     setAnswer("");
     setHasSubmitted(false);
+    setShowExplanation(false);
     try {
       const loaded = await getRewriteExercise(
         currentLanguageProfile.language_code,
@@ -156,6 +158,19 @@ function RewriteScreen() {
                   multiline
                   style={styles.input}
                 />
+                {exercise.explanation_short ? (
+                  <View style={styles.explanationWrap}>
+                    <Text
+                      style={styles.explanationToggle}
+                      onPress={() => setShowExplanation((prev) => !prev)}
+                    >
+                      {showExplanation ? "Hide explanation" : "Having trouble? Explain my error"}
+                    </Text>
+                    {showExplanation ? (
+                      <Text style={styles.explanationText}>{exercise.explanation_short}</Text>
+                    ) : null}
+                  </View>
+                ) : null}
                 <View style={styles.buttonStack}>
                   <PrimaryButton
                     label={hasSubmitted ? "Next Sentence" : "Submit Rewrite"}
@@ -279,6 +294,24 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 24,
     marginBottom: 10,
+  },
+  explanationWrap: {
+    marginBottom: 12,
+  },
+  explanationToggle: {
+    color: colors.primary,
+    fontSize: 12,
+    fontWeight: "700",
+    marginBottom: 10,
+  },
+  explanationText: {
+    color: colors.textMuted,
+    lineHeight: 22,
+    backgroundColor: colors.surfaceMuted,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    padding: 12,
   },
   input: {
     minHeight: 96,

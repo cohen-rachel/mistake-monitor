@@ -39,6 +39,7 @@ export default function Rewrite() {
   const [loading, setLoading] = useState(false);
   const [seenMistakeIds, setSeenMistakeIds] = useState<number[]>([]);
   const [hasSubmitted, setHasSubmitted] = useState(false);
+  const [showExplanation, setShowExplanation] = useState(false);
 
   const loadExercise = async (options?: {
     postMessage?: string;
@@ -52,6 +53,7 @@ export default function Rewrite() {
     setNoMistakesMessage(null);
     setAnswer("");
     setHasSubmitted(false);
+    setShowExplanation(false);
     try {
       const ex = await getRewriteExercise(
         currentLanguageProfile.language_code,
@@ -177,6 +179,41 @@ export default function Rewrite() {
                 marginBottom: 10,
               }}
             />
+            {exercise.explanation_short ? (
+              <div style={{ marginBottom: 12 }}>
+                <button
+                  type="button"
+                  onClick={() => setShowExplanation((prev) => !prev)}
+                  style={{
+                    border: "none",
+                    background: "transparent",
+                    padding: 0,
+                    color: "#6366f1",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                  }}
+                >
+                  {showExplanation ? "Hide explanation" : "Having trouble? Explain my error"}
+                </button>
+                {showExplanation ? (
+                  <div
+                    style={{
+                      marginTop: 10,
+                      padding: 12,
+                      borderRadius: 8,
+                      background: "#f8fafc",
+                      border: "1px solid #e2e8f0",
+                      color: "#334155",
+                      fontSize: 14,
+                      lineHeight: 1.7,
+                    }}
+                  >
+                    {exercise.explanation_short}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
             <div style={{ display: "flex", gap: 8 }}>
               <button
                 style={btnPrimary}
