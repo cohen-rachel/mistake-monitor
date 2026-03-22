@@ -45,6 +45,8 @@ export interface SessionOut {
   stt_confidence_summary?: number;
   status: string;
   mistake_count: number;
+  primary_mistake_type_label?: string;
+  mistake_type_labels: string[];
   primary_focus_label?: string;
   focus_labels: string[];
 }

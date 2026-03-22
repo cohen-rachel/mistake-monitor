@@ -44,6 +44,11 @@ export interface SessionOut {
   stt_provider?: string;
   stt_confidence_summary?: number;
   status: string;
+  mistake_count: number;
+  primary_mistake_type_label?: string;
+  mistake_type_labels: string[];
+  primary_focus_label?: string;
+  focus_labels: string[];
 }
 
 export interface PracticeSelection {
@@ -119,6 +124,7 @@ export interface SpeakingWinItem {
 
 export interface InsightsResponse {
   top_mistakes: MistakeCountItem[];
+  common_patterns: MistakeCountItem[];
   trends: TrendPoint[];
   recent_mistakes: RecentMistakeItem[];
   progress: ProgressPoint[];
