@@ -10,8 +10,9 @@ import TrendChart, {
 } from "../components/TrendChart";
 import type { InsightsResponse, SpeakingWinItem, MistakeCountItem } from "../types";
 import {
-  BarChart,
-  Bar,
+  PieChart as RechartsPieChart,
+  Pie,
+  Cell,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -26,9 +27,11 @@ const cardStyle: React.CSSProperties = {
   background: "#fff",
   border: "1px solid #e2e8f0",
   borderRadius: 8,
-  padding: 16,
+  padding: 12,
   textAlign: "center",
-  minWidth: 120,
+  minWidth: 96,
+  maxWidth: 116,
+  flex: "0 1 110px",
 };
 
 const speakingWinDetailStyle: React.CSSProperties = {
@@ -38,6 +41,8 @@ const speakingWinDetailStyle: React.CSSProperties = {
   borderRadius: 8,
   padding: 16,
 };
+
+const PIE_COLORS = ["#4338ca", "#0891b2", "#059669", "#d97706", "#dc2626", "#7c3aed"];
 
 const rangeOptions: Array<{ value: TrendRange; label: string }> = [
   { value: "7d", label: "7 days" },
@@ -230,6 +235,14 @@ export default function Insights() {
 
   const topMistakesForCards = useMemo(() => buildTopMistakesForRange(topRange), [buildTopMistakesForRange, topRange]);
   const topMistakesForBar = useMemo(() => buildTopMistakesForRange(barRange), [buildTopMistakesForRange, barRange]);
+  const topMistakesForPie = useMemo(
+    () =>
+      topMistakesForBar.slice(0, 6).map((item, index) => ({
+        ...item,
+        fill: PIE_COLORS[index % PIE_COLORS.length],
+      })),
+    [topMistakesForBar]
+  );
   const filteredProgress = useMemo(
     () => (data ? filterByRange(data.progress, progressRange, (item) => item.date) : []),
     [data, progressRange]
@@ -362,17 +375,17 @@ export default function Insights() {
             >
               <div
                 style={{
-                  fontSize: 28,
+                  fontSize: 24,
                   fontWeight: 700,
                   color: "#4338ca",
                 }}
               >
                 {item.count}
               </div>
-              <div style={{ fontSize: 13, color: "#475569", fontWeight: 600 }}>
+              <div style={{ fontSize: 12, color: "#475569", fontWeight: 600 }}>
                 {item.label}
               </div>
-              <div style={{ fontSize: 11, color: "#94a3b8" }}>{item.code}</div>
+              <div style={{ fontSize: 10, color: "#94a3b8" }}>{item.code}</div>
               {hoveredCode === item.code && (
                 <div
                   style={{
@@ -434,15 +447,52 @@ export default function Insights() {
           padding: 16,
         }}
       >
-        <ResponsiveContainer width="100%" height={280}>
-          <BarChart data={topMistakesForBar}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-            <XAxis dataKey="label" fontSize={12} />
-            <YAxis allowDecimals={false} fontSize={12} />
-            <Tooltip />
-            <Bar dataKey="count" fill="#4338ca" />
-          </BarChart>
-        </ResponsiveContainer>
+        {topMistakesForPie.length === 0 ? (
+          <p style={{ color: "#94a3b8", margin: 0 }}>
+            No mistakes recorded yet in this time range.
+          </p>
+        ) : (
+          <div style={{ display: "flex", gap: 24, alignItems: "center", flexWrap: "wrap" }}>
+            <div style={{ width: 320, height: 280 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <RechartsPieChart>
+                  <Pie
+                    data={topMistakesForPie}
+                    dataKey="count"
+                    nameKey="label"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={92}
+                    innerRadius={40}
+                  >
+                    {topMistakesForPie.map((item) => (
+                      <Cell key={item.code} fill={item.fill} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(value: number, name: string) => [value, name]} />
+                </RechartsPieChart>
+              </ResponsiveContainer>
+            </div>
+            <div style={{ display: "grid", gap: 10, minWidth: 220, flex: 1 }}>
+              {topMistakesForPie.map((item) => (
+                <div key={item.code} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span
+                    style={{
+                      width: 12,
+                      height: 12,
+                      borderRadius: 999,
+                      background: item.fill,
+                      flexShrink: 0,
+                    }}
+                  />
+                  <div style={{ color: "#334155", fontSize: 13 }}>
+                    <strong>{item.label}</strong> ({item.count})
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>

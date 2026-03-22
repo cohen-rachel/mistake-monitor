@@ -5,6 +5,7 @@ import SectionCard from "../components/SectionCard";
 import VerticalBarChart from "../components/VerticalBarChart";
 import PieChart from "../components/PieChart";
 import TimeSeriesChart from "../components/TimeSeriesChart";
+import StackedTrendChart from "../components/StackedTrendChart";
 import SelectField from "../components/SelectField";
 import { getInsights } from "../services/api";
 import { useLanguageContext } from "../contexts/LanguageContext";
@@ -223,25 +224,8 @@ function InsightsScreen() {
   );
 
   const trendItems = useMemo(() => {
-    if (!data) {
-      return [];
-    }
-    const grouped = new Map<string, number>();
-    filterByRange(data.trends, trendRange, (item) => item.date).forEach((point) => {
-      grouped.set(
-        point.mistake_type_code,
-        (grouped.get(point.mistake_type_code) || 0) + point.count
-      );
-    });
-    return Array.from(grouped.entries())
-      .map(([label, value], index) => ({
-        key: `trend-${label}-${index}`,
-        label: humanizeCode(label),
-        value,
-        accent: ["#2563eb", "#0891b2", "#059669", "#d97706", "#dc2626"][index % 5],
-      }))
-      .sort((a, b) => b.value - a.value);
-  }, [data, trendRange]);
+    return data?.trends ?? [];
+  }, [data]);
 
   const progressItems = useMemo(() => {
     if (!data) {
@@ -332,40 +316,6 @@ function InsightsScreen() {
             </View>
           ) : null}
 
-          {allSpeakingWins.length > 0 ? (
-            <SectionCard>
-              <Pressable
-                onPress={() => setWinsExpanded((prev) => !prev)}
-                style={styles.expandHeader}
-              >
-                <Text style={styles.sectionTitle}>
-                  All Improvements ({allSpeakingWins.length})
-                </Text>
-                <Text style={styles.expandToggle}>{winsExpanded ? "Hide" : "Show"}</Text>
-              </Pressable>
-              {winsExpanded
-                ? allSpeakingWins.map((win) => (
-                    <View key={win.event_id}>
-                      <Pressable
-                        onPress={() =>
-                          setSelectedSpeakingWinId((prev) =>
-                            prev === win.event_id ? null : win.event_id
-                          )
-                        }
-                        style={styles.winRow}
-                      >
-                        <Text style={styles.winSummary}>{win.summary}</Text>
-                        <Text style={styles.winDate}>{win.created_at}</Text>
-                      </Pressable>
-                      {selectedSpeakingWinId === win.event_id ? (
-                        <SpeakingWinDetails win={win} />
-                      ) : null}
-                    </View>
-                  ))
-                : null}
-            </SectionCard>
-          ) : null}
-
           <SectionCard>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Top Mistake Types</Text>
@@ -408,7 +358,7 @@ function InsightsScreen() {
 
           <SectionCard>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Error Trends By Type</Text>
+              <Text style={styles.sectionTitle}>Error Trends Over Time</Text>
               <SelectField
                 value={trendRange}
                 options={rangeOptions}
@@ -416,10 +366,10 @@ function InsightsScreen() {
                 compact
               />
             </View>
-            <VerticalBarChart
-              data={trendItems}
+            <StackedTrendChart
+              trends={trendItems}
+              range={trendRange}
               emptyMessage="No trend data yet. Analyze some sessions to see trends."
-              height={160}
             />
           </SectionCard>
 
@@ -429,7 +379,7 @@ function InsightsScreen() {
               style={styles.expandHeader}
             >
               <Text style={styles.sectionTitle}>
-                Most Common Error Patterns ({data.common_patterns.length})
+                Common Error Patterns ({data.common_patterns.length})
               </Text>
               <Text style={styles.expandToggle}>{patternsExpanded ? "Hide" : "Show"}</Text>
             </Pressable>
@@ -459,25 +409,40 @@ function InsightsScreen() {
             ) : null}
           </SectionCard>
 
-          <SectionCard>
-            <Text style={styles.sectionTitle}>Recent Mistakes</Text>
-            {data.recent_mistakes.length === 0 ? (
-              <Text style={styles.muted}>No recent mistakes yet.</Text>
-            ) : (
-              data.recent_mistakes.slice(0, 10).map((item) => (
-                <View key={item.id} style={styles.recentRow}>
-                  <Text style={styles.recentLabel}>{item.mistake_type_label}</Text>
-                  <Text style={styles.recentText}>
-                    {item.transcript_span || "(unknown)"} {"->"}{" "}
-                    {item.suggested_correction || "(no suggestion)"}
-                  </Text>
-                  {item.explanation_short ? (
-                    <Text style={styles.recentMeta}>{item.explanation_short}</Text>
-                  ) : null}
-                </View>
-              ))
-            )}
-          </SectionCard>
+          {allSpeakingWins.length > 0 ? (
+            <SectionCard>
+              <Pressable
+                onPress={() => setWinsExpanded((prev) => !prev)}
+                style={styles.expandHeader}
+              >
+                <Text style={styles.sectionTitle}>
+                  Recent Improvement Wins ({allSpeakingWins.length})
+                </Text>
+                <Text style={styles.expandToggle}>{winsExpanded ? "Hide" : "Show"}</Text>
+              </Pressable>
+              {winsExpanded
+                ? allSpeakingWins.map((win) => (
+                    <View key={win.event_id}>
+                      <Pressable
+                        onPress={() =>
+                          setSelectedSpeakingWinId((prev) =>
+                            prev === win.event_id ? null : win.event_id
+                          )
+                        }
+                        style={styles.winRow}
+                      >
+                        <Text style={styles.winSummary}>{win.summary}</Text>
+                        <Text style={styles.winDate}>{win.created_at}</Text>
+                      </Pressable>
+                      {selectedSpeakingWinId === win.event_id ? (
+                        <SpeakingWinDetails win={win} />
+                      ) : null}
+                    </View>
+                  ))
+                : null}
+            </SectionCard>
+          ) : null}
+
         </>
       )}
     </Screen>

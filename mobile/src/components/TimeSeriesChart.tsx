@@ -32,10 +32,12 @@ export default function TimeSeriesChart({
   data,
   emptyMessage,
   color = colors.danger,
+  yAxisTitle = "Error Rate / 100 Words",
 }: {
   data: Point[];
   emptyMessage: string;
   color?: string;
+  yAxisTitle?: string;
 }) {
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const chartWidth = 320;
@@ -168,7 +170,7 @@ export default function TimeSeriesChart({
           origin={`${16},${chartHeight / 2}`}
           textAnchor="middle"
         >
-          Error Rate / 100 Words
+          {yAxisTitle}
         </SvgText>
         <Path d={path} fill="none" stroke={color} strokeWidth="3" />
         {normalized.map((point) => {
