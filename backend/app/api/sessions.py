@@ -88,24 +88,46 @@ def _mistake_focus_label(mistake: Mistake) -> str | None:
     return None
 
 
-def _session_focus_summary(session: Session) -> tuple[int, str | None, list[str]]:
+def _session_focus_summary(
+    session: Session,
+) -> tuple[int, str | None, list[str], str | None, list[str]]:
     if not session.mistakes:
-        return 0, None, []
+        return 0, None, [], None, []
 
+    type_counts: dict[str, int] = {}
     counts: dict[str, int] = {}
     for mistake in session.mistakes:
+        if mistake.mistake_type and mistake.mistake_type.label:
+            type_label = _humanize_focus_label(mistake.mistake_type.label)
+            type_counts[type_label] = type_counts.get(type_label, 0) + 1
         label = _mistake_focus_label(mistake)
         if not label:
             continue
         counts[label] = counts.get(label, 0) + 1
 
+    ordered_type_labels = [
+        label for label, _ in sorted(type_counts.items(), key=lambda item: (-item[1], item[0]))
+    ]
+
     if not counts:
-        return len(session.mistakes), None, []
+        return (
+            len(session.mistakes),
+            ordered_type_labels[0] if ordered_type_labels else None,
+            ordered_type_labels,
+            None,
+            [],
+        )
 
     ordered_labels = [
         label for label, _ in sorted(counts.items(), key=lambda item: (-item[1], item[0]))
     ]
-    return len(session.mistakes), ordered_labels[0], ordered_labels
+    return (
+        len(session.mistakes),
+        ordered_type_labels[0] if ordered_type_labels else None,
+        ordered_type_labels,
+        ordered_labels[0],
+        ordered_labels,
+    )
 
 
 async def _load_session_detail(db: AsyncSession, session_id: int) -> Session:
@@ -265,7 +287,13 @@ async def list_sessions(
     sessions = result.scalars().all()
     session_items = []
     for session in sessions:
-        mistake_count, primary_focus_label, focus_labels = _session_focus_summary(session)
+        (
+            mistake_count,
+            primary_mistake_type_label,
+            mistake_type_labels,
+            primary_focus_label,
+            focus_labels,
+        ) = _session_focus_summary(session)
         session_items.append(
             SessionOut(
                 id=session.id,
@@ -277,6 +305,8 @@ async def list_sessions(
                 stt_confidence_summary=session.stt_confidence_summary,
                 status=session.status,
                 mistake_count=mistake_count,
+                primary_mistake_type_label=primary_mistake_type_label,
+                mistake_type_labels=mistake_type_labels,
                 primary_focus_label=primary_focus_label,
                 focus_labels=focus_labels,
             )

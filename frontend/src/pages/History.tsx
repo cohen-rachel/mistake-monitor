@@ -100,8 +100,10 @@ export default function History() {
     }
 
     next.sort((a, b) => {
-      const aLabel = a.primary_focus_label || (a.mistake_count > 0 ? "Other mistakes" : "No mistakes");
-      const bLabel = b.primary_focus_label || (b.mistake_count > 0 ? "Other mistakes" : "No mistakes");
+      const aLabel =
+        a.primary_mistake_type_label || (a.mistake_count > 0 ? "Other mistakes" : "No mistakes");
+      const bLabel =
+        b.primary_mistake_type_label || (b.mistake_count > 0 ? "Other mistakes" : "No mistakes");
       if (aLabel !== bLabel) {
         return aLabel.localeCompare(bLabel);
       }
@@ -120,7 +122,7 @@ export default function History() {
         session.status === "error"
           ? "Error"
           : session.mistake_count > 0
-          ? session.primary_focus_label || "Other mistakes"
+          ? session.primary_mistake_type_label || "Other mistakes"
           : "No mistakes";
       const existing = groups.get(label);
       if (existing) {

@@ -89,6 +89,8 @@ class SessionOut(BaseModel):
     stt_confidence_summary: Optional[float] = None
     status: str
     mistake_count: int = 0
+    primary_mistake_type_label: Optional[str] = None
+    mistake_type_labels: list[str] = []
     primary_focus_label: Optional[str] = None
     focus_labels: list[str] = []
 
