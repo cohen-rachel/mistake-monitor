@@ -265,33 +265,33 @@ export default function Rewrite() {
         ) : !stats ? (
           <p style={{ color: "#94a3b8" }}>No stats yet.</p>
         ) : (
-          <>
-            <p style={{ marginBottom: 8, color: "#334155" }}>
-              Overall accuracy: <strong>{Math.round(stats.overall_accuracy * 100)}%</strong> (
-              {stats.total_correct}/{stats.total_attempts})
-            </p>
-            {stats.recent_attempts.slice(0, 8).map((item, idx) => (
-              <div
-                key={idx}
-                style={{
-                  borderTop: idx === 0 ? "none" : "1px solid #e2e8f0",
-                  paddingTop: idx === 0 ? 0 : 8,
-                  marginTop: idx === 0 ? 0 : 8,
-                  fontSize: 13,
-                  color: "#475569",
-                }}
-              >
-                <span style={{ color: "#b91c1c" }}>{item.wrong_span || "(unknown)"}</span>
-                {" -> "}
-                <span style={{ color: "#166534" }}>{item.expected_correction || "(unknown)"}</span>
-                {" · accuracy "}
-                <strong>{Math.round(item.accuracy * 100)}%</strong>
-                {item.latest_result !== undefined && (
-                  <span>{item.latest_result ? " · latest correct" : " · latest incorrect"}</span>
-                )}
-              </div>
-            ))}
-          </>
+          <div
+            style={{
+              background: "#f8fafc",
+              border: "1px solid #e2e8f0",
+              borderRadius: 12,
+              padding: 20,
+              textAlign: "center",
+            }}
+          >
+            <div
+              style={{
+                fontSize: 40,
+                fontWeight: 800,
+                color: "#4338ca",
+                lineHeight: 1,
+                marginBottom: 8,
+              }}
+            >
+              {Math.round(stats.overall_accuracy * 100)}%
+            </div>
+            <div style={{ color: "#334155", fontWeight: 600, marginBottom: 4 }}>
+              Rewrite accuracy
+            </div>
+            <div style={{ color: "#64748b", fontSize: 14 }}>
+              {stats.total_correct} correct out of {stats.total_attempts} attempts
+            </div>
+          </div>
         )}
       </div>
     </div>

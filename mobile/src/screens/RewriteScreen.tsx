@@ -220,42 +220,15 @@ function RewriteScreen() {
             ) : !stats ? (
               <Text style={styles.muted}>No stats yet.</Text>
             ) : (
-              <>
-                <Text style={styles.summary}>
-                  Overall accuracy:{" "}
-                  <Text style={styles.strong}>
-                    {Math.round(stats.overall_accuracy * 100)}%
-                  </Text>{" "}
-                  ({stats.total_correct}/{stats.total_attempts})
+              <View style={styles.statsCard}>
+                <Text style={styles.statsValue}>
+                  {Math.round(stats.overall_accuracy * 100)}%
                 </Text>
-                {stats.recent_attempts.slice(0, 8).map((item, index) => (
-                  <View
-                    key={`${item.wrong_span || "unknown"}-${index}`}
-                    style={[
-                      styles.attemptRow,
-                      index === 0 ? null : styles.attemptRowBorder,
-                    ]}
-                  >
-                    <Text style={styles.attemptText}>
-                      <Text style={styles.wrong}>
-                        {item.wrong_span || "(unknown)"}
-                      </Text>
-                      {" -> "}
-                      <Text style={styles.correct}>
-                        {item.expected_correction || "(unknown)"}
-                      </Text>
-                    </Text>
-                    <Text style={styles.attemptMeta}>
-                      Accuracy {Math.round(item.accuracy * 100)}%
-                      {item.latest_result !== undefined
-                        ? item.latest_result
-                          ? " | latest correct"
-                          : " | latest incorrect"
-                        : ""}
-                    </Text>
-                  </View>
-                ))}
-              </>
+                <Text style={styles.statsLabel}>Rewrite accuracy</Text>
+                <Text style={styles.statsMeta}>
+                  {stats.total_correct} correct out of {stats.total_attempts} attempts
+                </Text>
+              </View>
             )}
           </SectionCard>
         </>
@@ -332,38 +305,30 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     lineHeight: 20,
   },
-  summary: {
-    color: colors.textMuted,
-    marginBottom: 12,
-    lineHeight: 20,
+  statsCard: {
+    backgroundColor: colors.surfaceMuted,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 14,
+    paddingVertical: 22,
+    paddingHorizontal: 16,
+    alignItems: "center",
   },
-  strong: {
-    color: colors.text,
+  statsValue: {
+    color: "#4338ca",
+    fontSize: 40,
     fontWeight: "800",
+    marginBottom: 8,
   },
-  attemptRow: {
-    paddingVertical: 10,
+  statsLabel: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: "700",
+    marginBottom: 4,
   },
-  attemptRowBorder: {
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
-  attemptText: {
-    color: colors.textMuted,
-    lineHeight: 20,
-  },
-  attemptMeta: {
+  statsMeta: {
     color: colors.textSoft,
-    marginTop: 4,
-    fontSize: 13,
-  },
-  wrong: {
-    color: "#b91c1c",
-    fontWeight: "700",
-  },
-  correct: {
-    color: "#166534",
-    fontWeight: "700",
+    fontSize: 14,
   },
   muted: {
     color: colors.textSoft,
