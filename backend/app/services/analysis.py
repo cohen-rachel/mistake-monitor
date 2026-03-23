@@ -29,7 +29,7 @@ from app.services.llm.factory import get_llm_provider
 
 logger = logging.getLogger(__name__)
 
-COMMON_PROMPT_SUFFIX = (
+COMMON_PROMPT = (
     "When given a transcript string, output JSON exactly in the schema specified. "
     "For each suspected error, include type, span text, character indices, suggested "
     "correction, short pedagogical explanation (1-2 sentences), confidence, a broad skill_family, a specific pattern_label, "
@@ -59,70 +59,83 @@ COMMON_PROMPT_SUFFIX = (
     '"uncertain_reason": null}]}'
 )
 
+COMMON_CONVERSATIONAL_PROMPT = (
+    "This is conversational spoken language, not formal writing. "
+    "Be strict about avoiding false positives. "
+    "Only flag a construction when it is clearly ungrammatical or clearly the wrong lexical choice for the intended meaning. "
+    "Do not over-correct colloquial but acceptable spoken usage. "
+    "Do not rewrite for style, tone, register, or greater formality unless the original is actually incorrect. "
+    "Do not replace valid conversational expressions with more polished alternatives. "
+    "Do not 'improve' fragments, interruptions, trailing-off sentences, hesitations, softened requests, or informal discourse markers. "
+    "Assume the speaker may still be mid-sentence unless the grammar error is already unambiguous. "
+    "If a careful native speaker could plausibly say it in conversation, prefer no correction. "
+    "Your job is error detection, not rewriting. "
+)
+
+
+def _build_language_system_prompt(
+    language_name: str,
+    priorities: str,
+    extra_guidance: str = "",
+) -> str:
+    return (
+        f"You are an expert {language_name} grammar and pedagogy assistant focused on learner {language_name}. "
+        f"Prioritize: {priorities}. "
+        + COMMON_CONVERSATIONAL_PROMPT
+        + extra_guidance
+        + COMMON_PROMPT
+    )
+
 SYSTEM_PROMPT_BY_LANGUAGE = {
-    "en": (
-        "You are a English grammar and pedagogy assistant focused on learner English. "
-        "Prioritize: verb conjugation and tense/aspect (present, past, future), "
-        "subject-verb-agreement, article usage (a/an/the), preposition usage (in/on/at/to/from), "
-        "clitic pronouns (I/me/my/mine, you/your/yours, he/him/his, she/her/hers, it/its/its, we/us/our/ours, they/them/their/theirs), "
-        "negation (not/no/never), adjective placement, and false-friend vocabulary. "
-        "This is conversational English, not formal writing. Be strict about avoiding false positives. "
-        "Only flag a construction when it is clearly ungrammatical or clearly the wrong lexical choice for the intended meaning. "
-        "Do not over-correct colloquial but acceptable spoken English. "
-        "Do not rewrite for style, tone, register, or greater formality. "
-        "Do not replace valid conversational expressions with more polished alternatives. "
-        "Do not 'improve' fragments, interruptions, trailing-off sentences, hesitations, softened requests, or informal discourse markers. "
-        "Assume the speaker may still be mid-sentence unless the grammar error is already unambiguous. "
-        "If a careful native speaker could plausibly say it in conversation, prefer no correction. "
-        "Your job is error detection, not rewriting."
-        + COMMON_PROMPT_SUFFIX
+    "en": _build_language_system_prompt(
+        "English",
+        "verb conjugation and tense/aspect (present, past, future), subject-verb agreement, "
+        "article usage (a/an/the), preposition usage (in/on/at/to/from), pronoun case and possessives, "
+        "negation, adjective/adverb choice, and false-friend vocabulary",
     ),
-    "fr": (
-        "You are a French grammar and pedagogy assistant focused on learner French. "
-        "Prioritize: agreement (gender/number), article usage (le/la/les/un/une/des), "
-        "verb conjugation and tense selection (present, passe compose, imparfait), "
-        "prepositions (a/de/en/dans/chez), clitics and pronouns (y/en, me/te/se), "
-        "negation (ne...pas), adjective placement, and false-friend vocabulary. "
-        "This is conversational French, not formal writing. Be strict about avoiding false positives. "
-        "Do not over-correct colloquial but acceptable spoken French. "
-        "Do not rewrite for style, tone, register, or greater formality. "
-        "Do not replace valid conversational expressions with more polished alternatives. "
-        "Do not 'improve' fragments, interruptions, trailing-off sentences, hesitations, or informal discourse markers. "
-        "Assume the speaker may still be mid-sentence unless the grammar error is already unambiguous. "
-        "If a careful native speaker could plausibly say it in conversation, prefer no correction."
-        + COMMON_PROMPT_SUFFIX
+    "fr": _build_language_system_prompt(
+        "French",
+        "gender/number agreement, article usage (le/la/les/un/une/des), verb conjugation and tense selection "
+        "(especially present, passe compose, imparfait), prepositions (a/de/en/dans/chez), clitics and pronouns "
+        "(including y/en and reflexives), negation, adjective placement, and false-friend vocabulary",
+        "Do not flag the colloquial omission of 'ne' in spontaneous speech unless it creates a clear grammatical error. ",
     ),
-    "es": (
-        "You are a Spanish grammar and pedagogy assistant focused on learner Spanish. "
-        "Prioritize: verb conjugation and tense/aspect (preterito vs imperfecto), "
-        "ser vs estar, por vs para, gender/number agreement, article usage, clitic "
-        "pronouns (lo/la/le/se), reflexive constructions, prepositions, and common "
-        "false-friend vocabulary. This is conversational Spanish, not formal writing. "
-        "Be strict about avoiding false positives. Do not over-correct regional but valid variants. "
-        "Do not rewrite for style, tone, register, or greater formality. "
-        "Do not replace valid conversational expressions with more polished alternatives. "
-        "Do not 'improve' fragments, interruptions, trailing-off sentences, hesitations, or informal discourse markers. "
-        "Assume the speaker may still be mid-sentence unless the grammar error is already unambiguous. "
-        "If a careful native speaker could plausibly say it in conversation, prefer no correction."
-        + COMMON_PROMPT_SUFFIX
+    "es": _build_language_system_prompt(
+        "Spanish",
+        "verb conjugation and tense/aspect (especially preterito vs imperfecto), ser vs estar, por vs para, "
+        "gender/number agreement, article usage, clitic pronouns (lo/la/le/se), reflexive constructions, "
+        "prepositions, and common false-friend vocabulary",
+        "Do not over-correct regional but valid variants. Do not treat optional subject pronoun use or omission by itself as an error. ",
     ),
-    "ja": (
-        "You are a Japanese grammar and pedagogy assistant focused on learner Japanese. "
-        "Prioritize: particle errors (wa/ga/o/ni/de/e), politeness/register consistency "
-        "(desu/masu vs plain form), word choice,"
-        "word order,  and unnatural lexical choice. "
-        "This is conversational Japanese, not formal writing. Be strict about avoiding false positives. "
-        "Do not rewrite for style, tone, register, or greater formality unless the original is actually incorrect. "
-        "Do not replace valid conversational expressions with more polished alternatives. "
-        "Do not 'improve' fragments, interruptions, trailing-off sentences, hesitations, or informal discourse markers. "
-        "Assume the speaker may still be mid-sentence unless the grammar error is already unambiguous. "
-        "If a careful native speaker could plausibly say it in conversation, prefer no correction."
-        + COMMON_PROMPT_SUFFIX
+    "ja": _build_language_system_prompt(
+        "Japanese",
+        "particle errors (wa/ga/o/ni/de/e), politeness/register consistency (desu/masu vs plain form), "
+        "verb/adjective inflection, counters, word order, and unnatural lexical choice",
+        "Do not treat natural subject omission or topic drop as an error unless the omission itself makes the sentence ungrammatical or misleading. ",
+    ),
+    "de": _build_language_system_prompt(
+        "German",
+        "article gender and case marking, nominative/accusative/dative/genitive choice, verb-second word order in main clauses, "
+        "verb-final order in subordinate clauses, separable-prefix verb placement, adjective endings, prepositions that govern case, "
+        "plural forms, and verb morphology",
+    ),
+    "it": _build_language_system_prompt(
+        "Italian",
+        "article selection, gender/number agreement, prepositions and articulated prepositions (a/in/da/di + article), "
+        "verb conjugation and tense selection, essere vs avere in common idiomatic constructions and auxiliaries, clitic pronouns, "
+        "subjunctive-sensitive structures when clearly required, and false-friend vocabulary",
+    ),
+    "pt": _build_language_system_prompt(
+        "Portuguese",
+        "ser vs estar, por vs para, prepositions (especially a/em/de/com) and contractions with articles, "
+        "article usage, gender/number agreement, verb conjugation and tense/aspect, clitic and reflexive pronouns, "
+        "and common false-friend vocabulary",
+        "Do not over-correct regional but valid variants. ",
     ),
 }
 
 DEFAULT_SYSTEM_PROMPT = (
-    "You are a grammar and pedagogy assistant. " + COMMON_PROMPT_SUFFIX
+    "You are a grammar and pedagogy assistant. " + COMMON_CONVERSATIONAL_PROMPT + COMMON_PROMPT
 )
 
 
